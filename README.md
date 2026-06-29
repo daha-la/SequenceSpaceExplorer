@@ -1,1 +1,1 @@
-# SequenceSpaceExplorer
+# Sequence Space Explorer
