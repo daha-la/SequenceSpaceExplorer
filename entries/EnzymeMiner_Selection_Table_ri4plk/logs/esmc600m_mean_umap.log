@@ -1,0 +1,7 @@
+tool        : sse_coordinates 1.0.0
+timestamp   : 2026-06-30T12:08:02.922955+00:00
+datafile    : C:\Users\dhard\GitHub\SequenceSpaceExplorer\entries\EnzymeMiner_Selection_Table_ri4plk\EnzymeMiner_Selection_Table_ri4plk.sse.tsv
+tag         : esmc600m_mean
+embedder    : esmc  pooling=mean
+reducer     : umap  components=10
+rows        : 9974  embedded=9974  skipped=0

@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "source_file": "Foldseek_2026_05_21_13_42_55.json",
+  "source_type": "fs",
+  "creation_tool": "sse_initialization",
+  "creation_tool_version": "1.0.0",
+  "created_utc": "2026-06-29T20:51:19.374079+00:00",
+  "id_resolution": {
+    "unique_targets": 7640,
+    "self_hit": "4m60-assembly1_A"
+  },
+  "row_counts": {
+    "kept": 7640,
+    "dropped": 0,
+    "dropped_reason": "",
+    "queries": 1
+  },
+  "dropped_ids": [],
+  "columns": [
+    {
+      "name": "id",
+      "type": "id",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "Sequence",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "query",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "taxName",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "5819/7640"
+    },
+    {
+      "name": "taxId",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "5808/7640"
+    },
+    {
+      "name": "Description",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "3494/7640"
+    },
+    {
+      "name": "Databases",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "length",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "acidic_count",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "basic_count",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "acidic_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "basic_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "ED_RK_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "ED_IK_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7638/7640"
+    },
+    {
+      "name": "net_charge_pH7",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "MW",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "pI",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "aromaticity",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "instability_index",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    },
+    {
+      "name": "GRAVY",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "7640/7640"
+    }
+  ],
+  "last_modified_utc": "2026-06-29T20:51:19.523838+00:00",
+  "last_tool": "sse_initialization"
+}
