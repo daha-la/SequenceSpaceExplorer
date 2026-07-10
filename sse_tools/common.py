@@ -115,6 +115,50 @@ def resolve_input_path(name: str, fallback_dir) -> Path:
     abort(f"input file not found: {name!r}. Looked at {p} and {cand}.")
 
 
+def resolve_entry_path(arg: str, entries_dir=None) -> Path:
+    """Resolve ENTRY to its datafile path. Shared by every script/tool that
+    takes an ENTRY argument, so 'point me at an entry' means the same thing
+    everywhere: sse_coordinates.py, fetch_taxonomy.py, merge_external.py, and
+    (wrapped with its own working-directory setup) the visualizer's
+    EntryContext. Previously each had its own slightly different copy of
+    this; this is the one place it's implemented.
+
+    ENTRY may be:
+      - a direct path to a .sse.tsv file
+      - an entry directory containing exactly one .sse.tsv file
+      - a bare stem, looked up as <entries_dir>/<stem>/<stem>.sse.tsv, or
+        (if that exact name isn't found) the entry directory's sole
+        .sse.tsv file
+    """
+    if not arg:
+        abort("No entry supplied.")
+    root = Path(entries_dir) if entries_dir else ENTRIES_DIR
+    p = Path(arg)
+
+    if p.exists() and p.is_file():
+        if not p.name.endswith(".sse.tsv"):
+            abort(f"Expected an .sse.tsv datafile, got: {p}")
+        return p
+
+    if p.exists() and p.is_dir():
+        candidates = sorted(p.glob("*.sse.tsv"))
+        if len(candidates) != 1:
+            abort(f"Entry directory must contain exactly one .sse.tsv file, "
+                  f"found {len(candidates)}: {p}")
+        return candidates[0]
+
+    entry_d = root / arg
+    if not entry_d.exists():
+        abort(f"Entry not found: {entry_d}")
+    candidate = entry_d / f"{arg}.sse.tsv"
+    if candidate.exists():
+        return candidate
+    candidates = sorted(entry_d.glob("*.sse.tsv"))
+    if len(candidates) == 1:
+        return candidates[0]
+    abort(f"No datafile found for entry {arg!r}. Expected {candidate}")
+
+
 # ------------------------------------------------------------- datafile writing
 
 def write_datafile(df: pd.DataFrame, types: dict, path) -> None:

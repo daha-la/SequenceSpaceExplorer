@@ -18,7 +18,6 @@ from .common import (
     COL_ID,
     COL_QUERY,
     COL_SEQ,
-    ENTRIES_DIR,
     TYPE_COORDINATE,
     TYPE_ID,
     TYPE_LABEL,
@@ -26,6 +25,7 @@ from .common import (
     abort,
     id_column,
     read_datafile,
+    resolve_entry_path,
 )
 
 BOOL_STRINGS = {"true", "false", "yes", "no", "1", "0"}
@@ -37,6 +37,11 @@ NUMERIC_COL_THRESHOLD = 0.80
 MAX_CAT_UNIQUE = 200
 
 NAME_KEYWORDS = {"name", "label", "alias", "accession", "gene"}
+
+# Nesting-detection guardrails for the high-cardinality categorical rescue pass.
+_NEST_MIN_COVERAGE = 0.40
+_NEST_MIN_CLEAN_FRAC = 0.98
+_NEST_MIN_PAIR_OVERLAP = 0.40
 
 
 @dataclass(frozen=True)
@@ -71,37 +76,17 @@ class VisualizerState:
 
 
 def resolve_entry(arg: str | None, *, entries_dir=None) -> EntryContext:
-    """Resolve an entry stem, entry directory, or .sse.tsv path."""
-    root = Path(entries_dir) if entries_dir else ENTRIES_DIR
+    """Resolve an entry stem, entry directory, or .sse.tsv path, then set up
+    this entry's working directories. Path resolution itself is shared with
+    every other ENTRY-taking script via common.resolve_entry_path; this adds
+    only what's specific to the visualizer (figures/structures/msa_cache
+    dirs, and creating them).
+    """
     if not arg:
         abort("No entry supplied. Usage: python scripts/sse_visualizer.py <entry-stem|entry-dir|datafile.sse.tsv>")
-
-    p = Path(arg)
-    if p.exists() and p.is_file():
-        if not p.name.endswith(".sse.tsv"):
-            abort(f"Expected an .sse.tsv datafile, got: {p}")
-        entry_dir = p.parent
-        stem = p.name[:-len(".sse.tsv")]
-        datafile_path = p
-    elif p.exists() and p.is_dir():
-        entry_dir = p
-        candidates = sorted(entry_dir.glob("*.sse.tsv"))
-        if len(candidates) != 1:
-            abort(f"Entry directory must contain exactly one .sse.tsv file, found {len(candidates)}: {entry_dir}")
-        datafile_path = candidates[0]
-        stem = datafile_path.name[:-len(".sse.tsv")]
-    else:
-        entry_dir = root / arg
-        if not entry_dir.exists():
-            abort(f"Entry not found: {entry_dir}")
-        datafile_path = entry_dir / f"{arg}.sse.tsv"
-        if not datafile_path.exists():
-            candidates = sorted(entry_dir.glob("*.sse.tsv"))
-            if len(candidates) == 1:
-                datafile_path = candidates[0]
-            else:
-                abort(f"No datafile found for entry {arg!r}. Expected {datafile_path}")
-        stem = datafile_path.name[:-len(".sse.tsv")]
+    datafile_path = resolve_entry_path(arg, entries_dir=entries_dir)
+    entry_dir = datafile_path.parent
+    stem = datafile_path.name[:-len(".sse.tsv")]
 
     logs_dir = entry_dir / "logs"
     figures_dir = entry_dir / "figures"
@@ -204,6 +189,107 @@ def classify_label_column(col: str, s: pd.Series) -> str:
     return "categorical"
 
 
+# ---------------------------------------------------------------------------
+# High-cardinality categorical rescue
+# ---------------------------------------------------------------------------
+# classify_label_column skips anything above MAX_CAT_UNIQUE because a flat
+# dropdown with hundreds of entries is unusable. But some of those columns
+# (e.g. genus, species) are legitimate categories -- they are only large, not
+# free text -- and become usable once a *related* column is filtered, because
+# narrow_cat_options (in the visualizer) then shrinks them to a handful of
+# live values. So an oversized-but-legitimate column is "rescued" back to
+# categorical only when it has a nesting partner: another categorical column
+# it nests under, or that nests under it. A column with no such partner would
+# just be unfilterable clutter and stays skipped. This never assumes an order
+# between columns and never inspects column names (taxonomy ranks are not
+# special-cased; they are rescued because they happen to nest cleanly).
+
+def _is_high_card_categorical(s: pd.Series) -> bool:
+    """True if a column is a genuine categorical that was only skipped for
+    being above MAX_CAT_UNIQUE -- not numeric, boolean, date, numeric-list, or
+    free text. Unusable as a flat dropdown alone; usable once narrowed.
+    """
+    clean = s.replace("", pd.NA)
+    nn = clean.notna().sum()
+    nu = clean.nunique(dropna=True)
+    nt = len(s)
+    if nn == 0 or nu <= 1 or nt == 0:
+        return False
+    if nu <= MAX_CAT_UNIQUE:
+        return False  # would already be a normal categorical
+    if _is_numeric(s) or _is_boolean(s) or _is_date_like(s):
+        return False
+    if _is_numeric_list(s):
+        return False
+    non_null = clean.dropna().astype(str)
+    mean_len = non_null.str.len().mean()
+    unique_ratio = nu / nt
+    if unique_ratio >= HIGH_CARD_UNIQUE_RATIO and mean_len >= HIGH_CARD_MEAN_LEN:
+        return False  # free-text guard
+    return True
+
+
+def _nests(df: pd.DataFrame, child: str, parent: str) -> bool:
+    """True if `child` is a strict refinement of `parent`: child has more
+    unique values, and >= 98% of child values map to exactly one parent value
+    (a functional dependency child -> parent). Order-agnostic.
+    """
+    n = len(df)
+    child_s = df[child].replace("", pd.NA)
+    parent_s = df[parent].replace("", pd.NA)
+    if child_s.nunique(dropna=True) <= parent_s.nunique(dropna=True):
+        return False
+    sub = pd.DataFrame({"child": child_s, "parent": parent_s}).dropna()
+    if len(sub) < _NEST_MIN_PAIR_OVERLAP * n:
+        return False
+    parents_per_child = sub.groupby("child")["parent"].nunique()
+    return (parents_per_child <= 1).mean() >= _NEST_MIN_CLEAN_FRAC
+
+
+def has_nesting_partner(df: pd.DataFrame, col: str, partner_cols: List[str]) -> bool:
+    """True if `col` nests with at least one column in `partner_cols`, either
+    as parent or as child.
+    """
+    if df.empty or col not in df.columns:
+        return False
+    s = df[col].replace("", pd.NA)
+    if s.notna().mean() < _NEST_MIN_COVERAGE:
+        return False
+    for other in partner_cols:
+        if other == col or other not in df.columns:
+            continue
+        other_s = df[other].replace("", pd.NA)
+        if other_s.notna().mean() < _NEST_MIN_COVERAGE:
+            continue
+        if _nests(df, col, other) or _nests(df, other, col):
+            return True
+    return False
+
+
+def _rescue_high_card_categoricals(df: pd.DataFrame, types: Dict[str, str], meta: Dict[str, dict]) -> None:
+    """Promote skipped label columns back to categorical when they nest with
+    an already-categorical/tag_split column. Iterates so a chain like
+    family -> genus -> species is fully recovered: genus rescues via family,
+    then species rescues via the now-categorical genus.
+    """
+    label_cols = [c for c, t in types.items() if t == TYPE_LABEL]
+    candidates = [c for c in label_cols
+                  if meta[c]["type"] == "skip" and _is_high_card_categorical(df[c])]
+    partner_pool = [c for c in label_cols if meta[c]["type"] in ("categorical", "tag_split")]
+    changed = True
+    while changed and candidates:
+        changed = False
+        still_skipped = []
+        for col in candidates:
+            if has_nesting_partner(df, col, partner_pool):
+                meta[col]["type"] = "categorical"
+                partner_pool.append(col)
+                changed = True
+            else:
+                still_skipped.append(col)
+        candidates = still_skipped
+
+
 def build_col_meta(df: pd.DataFrame, types: Dict[str, str]) -> Dict[str, dict]:
     meta: Dict[str, dict] = {}
     for col in df.columns:
@@ -221,6 +307,7 @@ def build_col_meta(df: pd.DataFrame, types: Dict[str, str]) -> Dict[str, dict]:
                     all_tags.update(x.strip() for x in val.split(",") if x.strip())
                 tags = sorted(all_tags)
             meta[col] = {"type": col_type, "tags": tags, "override": None, "sse_type": t}
+    _rescue_high_card_categoricals(df, types, meta)
     return meta
 
 

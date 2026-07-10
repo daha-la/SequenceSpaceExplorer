@@ -726,8 +726,118 @@
       "params": "",
       "notes": "Boltz-2 pTM/pLDDT score columns written by the SSE visualizer.",
       "coverage": "3/9974"
+    },
+    {
+      "name": "tax_status",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9974/9974"
+    },
+    {
+      "name": "taxid",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9970/9974"
+    },
+    {
+      "name": "tax_organism",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9969/9974"
+    },
+    {
+      "name": "superkingdom",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9967/9974"
+    },
+    {
+      "name": "phylum",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9951/9974"
+    },
+    {
+      "name": "class",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9736/9974"
+    },
+    {
+      "name": "order",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9621/9974"
+    },
+    {
+      "name": "family",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9505/9974"
+    },
+    {
+      "name": "genus",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "9243/9974"
+    },
+    {
+      "name": "species",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "fetch_taxonomy",
+      "version": "2.1",
+      "params": "strategy=em,batch=100",
+      "notes": "",
+      "coverage": "8616/9974"
+    },
+    {
+      "name": "RMSD_vs_AgepGT_S3_r0_seq",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_rmsd",
+      "version": "",
+      "params": "",
+      "notes": "RMSD values against AgepGT_S3 rank 0.",
+      "coverage": "2/9974"
     }
   ],
-  "last_modified_utc": "2026-07-01T09:45:42.700173+00:00",
-  "last_tool": "sse_boltz"
+  "last_modified_utc": "2026-07-07T10:01:33.763971+00:00",
+  "last_tool": "sse_rmsd"
 }

@@ -94,7 +94,7 @@ DEFAULT_SYMBOL = "circle"
 DEFAULT_SELECTION_COLOR = "#e74c3c"
 
 LABEL_STYLE = {"fontSize": "13px", "marginLeft": "6px", "cursor": "pointer"}
-SECTION_STYLE = {"fontWeight": "600", "fontSize": "12px", "margin": "10px 0 6px 0", "color": "#555"}
+SECTION_STYLE = {"fontWeight": "600", "fontSize": "12px", "margin": "10px 0 6px 0", "color": "var(--text-muted)"}
 CONTROL_WRAPPER = {"marginLeft": "22px", "marginTop": "6px", "marginBottom": "4px"}
 
 ENTRY: EntryContext
@@ -113,13 +113,19 @@ _boltz_futures: dict[str, concurrent.futures.Future] = {}
 _STATE_LOCK = threading.RLock()
 
 
-def reload_state() -> str:
-    """Reload the datafile into module globals. Returns a warning/status string.
+def reload_state() -> tuple[str, list]:
+    """Reload the datafile into module globals. Returns (status_message, layers).
 
     The visualizer stores a few derived values as module globals because Dash
     callbacks need fast access to them. Reload builds a complete new state first
     and then swaps all globals while holding one lock, so render callbacks cannot
     observe a half-updated mix of old and new dataframe/axis metadata.
+
+    Layer-ID validation against the freshly loaded datafile happens here too
+    (spec §13), not just on the explicit Reload button: every path that calls
+    reload_state — startup, manual reload, Boltz completion, RMSD completion —
+    keeps logs/layers.json in sync with whatever the datafile now contains.
+    layers.json on disk is treated as canonical, per §14.4.
     """
     global _STATE, _ann_df, _types, _col_meta, _id_col, _x_col, _y_col, _query_ids, _name_cols
     new_state = load_visualizer_state(ENTRY)
@@ -133,7 +139,15 @@ def reload_state() -> str:
         _y_col = new_state.y_col
         _query_ids = new_state.query_ids
         _name_cols = new_state.name_cols
-    return new_state.warning
+        valid_ids = new_state.df[new_state.id_col].astype(str).tolist()
+
+    current_layers = layer_store.read_layers(ENTRY.layers_path)
+    cleaned_layers, layer_msg = layer_store.validate_layers(current_layers, valid_ids)
+    if cleaned_layers != current_layers:
+        layer_store.write_layers(ENTRY.layers_path, cleaned_layers)
+
+    status = " · ".join(x for x in [new_state.warning, layer_msg] if x)
+    return status, cleaned_layers
 
 
 def effective_type(col: str) -> str:
@@ -475,8 +489,8 @@ def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_
                 name=f"Selected ({len(sel_df)})", customdata=sel_df[_id_col].astype(str).tolist(), hovertemplate="<b>%{customdata}</b><br>Selected<extra></extra>",
             ))
     fig.update_layout(
-        xaxis=dict(title=x_col, constrain="domain"),
-        yaxis=dict(title=y_col, scaleanchor="x", scaleratio=1),
+        xaxis=dict(title=x_col, constrain="domain", showgrid=False),
+        yaxis=dict(title=y_col, scaleanchor="x", scaleratio=1, showgrid=False),
         template="simple_white", dragmode="pan", uirevision="sequence-space",
         legend=dict(itemsizing="constant", yanchor="bottom", y=0.01, xanchor="right", x=0.99),
         margin=dict(l=40, r=20, t=40, b=40),
@@ -503,7 +517,7 @@ def make_details_panel(sequence_id: str):
 
 def make_filter_panel():
     if not _col_meta:
-        return html.P("No columns loaded.", style={"fontSize": "12px", "color": "#aaa"})
+        return html.P("No columns loaded.", style={"fontSize": "12px", "color": "var(--text-faint)"})
     df = _ann_df
     children = []
     cont_cols = [c for c in cols_of_type("continuous") if _types.get(c) == TYPE_LABEL]
@@ -518,8 +532,8 @@ def make_filter_panel():
         children.append(html.P("Continuous", style=SECTION_STYLE))
         for col in cont_cols:
             vmin, vmax, step, marks = slider_config(df[col])
-            inp = {"width": "70px", "fontSize": "11px", "padding": "2px 4px", "border": "1px solid #ddd", "borderRadius": "3px", "textAlign": "center"}
-            children.append(html.Div([checkbox(col, col), html.Div(id={"type": "filter-control", "col": col}, children=[html.Div([dcc.Input(id={"type": "cont-min-input", "col": col}, type="number", value=vmin, step="any", debounce=True, style=inp), html.Span("–", style={"margin": "0 4px", "fontSize": "11px", "color": "#777"}), dcc.Input(id={"type": "cont-max-input", "col": col}, type="number", value=vmax, step="any", debounce=True, style=inp)], style={"display": "flex", "alignItems": "center", "marginBottom": "4px"}), dcc.RangeSlider(id={"type": "cont-slider", "col": col}, min=vmin, max=vmax, step=step, value=[vmin, vmax], marks=marks, allowCross=False, updatemode="mouseup")], style={"display": "none", **CONTROL_WRAPPER})], style={"marginBottom": "6px"}))
+            inp = {"width": "70px", "fontSize": "11px", "padding": "2px 4px", "border": "1px solid var(--border)", "borderRadius": "3px", "textAlign": "center"}
+            children.append(html.Div([checkbox(col, col), html.Div(id={"type": "filter-control", "col": col}, children=[html.Div([dcc.Input(id={"type": "cont-min-input", "col": col}, type="number", value=vmin, step="any", debounce=True, style=inp), html.Span("–", style={"margin": "0 4px", "fontSize": "11px", "color": "var(--text-faint)"}), dcc.Input(id={"type": "cont-max-input", "col": col}, type="number", value=vmax, step="any", debounce=True, style=inp)], style={"display": "flex", "alignItems": "center", "marginBottom": "4px"}), dcc.RangeSlider(id={"type": "cont-slider", "col": col}, min=vmin, max=vmax, step=step, value=[vmin, vmax], marks=marks, allowCross=False, updatemode="mouseup")], style={"display": "none", **CONTROL_WRAPPER})], style={"marginBottom": "6px"}))
     if bool_cols:
         children.append(html.P("Boolean", style=SECTION_STYLE))
         for col in bool_cols:
@@ -534,7 +548,7 @@ def make_filter_panel():
         for col in tag_cols:
             tags = _col_meta[col].get("tags", [])
             children.append(html.Div([checkbox(col, col), html.Div(id={"type": "filter-control", "col": col}, children=[dcc.Dropdown(id={"type": "tag-filter", "col": col}, options=[{"label": t, "value": t} for t in tags], value=[], multi=True, placeholder="Select tags…", style={"fontSize": "12px"})], style={"display": "none", **CONTROL_WRAPPER})], style={"marginBottom": "6px"}))
-    return children or html.P("No filterable label columns.", style={"fontSize": "12px", "color": "#aaa"})
+    return children or html.P("No filterable label columns.", style={"fontSize": "12px", "color": "var(--text-faint)"})
 
 
 def make_col_settings_panel():
@@ -543,20 +557,20 @@ def make_col_settings_panel():
     for col, meta in _col_meta.items():
         if _types.get(col) != TYPE_LABEL:
             continue
-        rows.append(html.Div([html.Span(col, title=col, style={"fontSize": "11px", "fontWeight": "500", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap", "flexGrow": "1"}), dcc.Dropdown(id={"type": "col-override", "col": col}, options=opts, value=effective_type(col), clearable=False, style={"fontSize": "11px", "width": "120px"})], style={"display": "flex", "alignItems": "center", "gap": "6px", "padding": "4px 2px", "borderBottom": "1px solid #f5f5f5"}))
+        rows.append(html.Div([html.Span(col, title=col, style={"fontSize": "11px", "fontWeight": "500", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap", "flexGrow": "1"}), dcc.Dropdown(id={"type": "col-override", "col": col}, options=opts, value=effective_type(col), clearable=False, style={"fontSize": "11px", "width": "120px"})], style={"display": "flex", "alignItems": "center", "gap": "6px", "padding": "4px 2px", "borderBottom": "1px solid var(--border-soft)"}))
     return html.Div(rows, style={"maxHeight": "350px", "overflowY": "auto"})
 
 
 def make_sidebar(layers):
     if not layers:
-        return html.Div("No saved layers yet.", style={"fontSize": "12px", "color": "#aaa", "padding": "8px 0"})
+        return html.Div("No saved layers yet.", style={"fontSize": "12px", "color": "var(--text-faint)", "padding": "8px 0"})
     rows = []
     n = len(layers)
     for i, layer in enumerate(layers):
         lid = layer["id"]
         visible = layer.get("visible", True)
         style = layer.get("style", {})
-        swatch_style = {"width": "12px", "height": "12px", "borderRadius": "2px", "border": "1px solid #ccc", "flexShrink": "0"}
+        swatch_style = {"width": "12px", "height": "12px", "borderRadius": "2px", "border": "1px solid var(--border)", "flexShrink": "0"}
         if style.get("color_mode") == "continuous":
             swatch = html.Div(style={**swatch_style, "background": "linear-gradient(to bottom, #440154, #31688e, #35b779, #fde725)"})
         else:
@@ -567,7 +581,7 @@ def make_sidebar(layers):
         if _x_col and _y_col and not _ann_df.empty:
             sub = _ann_df[_ann_df[_id_col].astype(str).isin([str(x) for x in layer.get("ids", [])])]
             n_cov = int(_covered(sub, _x_col, _y_col).sum())
-        rows.append(html.Div([swatch, html.Div([html.Div(layer.get("name", "Layer"), title=layer.get("name", "Layer"), style={"fontSize": "11px", "fontWeight": "500", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"}), html.Div(f"{n_cov:,}/{n_total:,} visible here", style={"fontSize": "10px", "color": "#aaa"})], style={"flexGrow": "1", "minWidth": "0", "margin": "0 4px"}), html.Button("↑", id={"type": "layer-up", "lid": lid}, disabled=i == 0, style=btn), html.Button("↓", id={"type": "layer-down", "lid": lid}, disabled=i == n - 1, style=btn), html.Button("⤴", id={"type": "layer-load", "lid": lid}, title="Load into working filter", style={**btn, "color": "#2980b9"}), html.Button("👁" if visible else "🚫", id={"type": "layer-toggle", "lid": lid}, style={**btn, "opacity": "1" if visible else "0.4"}), html.Button("✕", id={"type": "layer-delete", "lid": lid}, style={**btn, "color": "#e74c3c"})], style={"display": "flex", "alignItems": "center", "padding": "5px 2px", "borderBottom": "1px solid #f0f0f0", "opacity": "1" if visible else "0.5"}))
+        rows.append(html.Div([swatch, html.Div([html.Div(layer.get("name", "Layer"), title=layer.get("name", "Layer"), style={"fontSize": "11px", "fontWeight": "500", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"}), html.Div(f"{n_cov:,}/{n_total:,} visible here", style={"fontSize": "10px", "color": "var(--text-faint)"})], style={"flexGrow": "1", "minWidth": "0", "margin": "0 4px"}), html.Button("↑", id={"type": "layer-up", "lid": lid}, disabled=i == 0, style=btn), html.Button("↓", id={"type": "layer-down", "lid": lid}, disabled=i == n - 1, style=btn), html.Button("⤴", id={"type": "layer-load", "lid": lid}, title="Load into working filter", style={**btn, "color": "var(--accent)"}), html.Button("👁" if visible else "🚫", id={"type": "layer-toggle", "lid": lid}, style={**btn, "opacity": "1" if visible else "0.4"}), html.Button("✕", id={"type": "layer-delete", "lid": lid}, style={**btn, "color": "var(--danger)"})], style={"display": "flex", "alignItems": "center", "padding": "5px 2px", "borderBottom": "1px solid var(--border-soft)", "opacity": "1" if visible else "0.5"}))
     return html.Div(rows, style={"maxHeight": "400px", "overflowY": "auto"})
 
 
@@ -578,16 +592,16 @@ def current_job_records():
 
 def make_job_table(jobs: dict):
     if not jobs:
-        return html.Div("No Boltz jobs yet.", style={"fontSize": "11px", "color": "#aaa"})
+        return html.Div("No Boltz jobs yet.", style={"fontSize": "11px", "color": "var(--text-faint)"})
     rows = []
-    colors = {"queued":"#7f8c8d", "msa":"#2980b9", "predicting":"#e67e22", "done":"#27ae60", "cached":"#27ae60", "error":"#e74c3c", "interrupted":"#e67e22"}
+    colors = {"queued":"var(--text-muted)", "msa":"var(--accent)", "predicting":"var(--warning)", "done":"var(--success)", "cached":"var(--success)", "error":"var(--danger)", "interrupted":"var(--warning)"}
     for job in sorted(jobs.values(), key=lambda j: j.get("updated_utc", ""), reverse=True):
         status = job.get("status", "")
         sid = job.get("sequence_id", "")
         kind = job.get("kind", "apo")
         typ = "apo" if kind == "apo" else f"holo · {job.get('smiles_label') or job.get('smiles_hash', '')}"
-        rows.append(html.Tr([html.Td(sid[:16] + ("…" if len(sid) > 16 else ""), title=sid, style={"fontFamily": "monospace", "fontSize": "10px", "padding": "3px 5px"}), html.Td(typ, title=typ, style={"fontSize": "9px", "padding": "3px 5px"}), html.Td(status, style={"fontSize": "10px", "fontWeight": "600", "color": colors.get(status, "#555"), "padding": "3px 5px"}), html.Td(f"{job.get('ptm'):.3f}" if isinstance(job.get("ptm"), (int, float)) else "—", style={"fontFamily": "monospace", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(f"{job.get('plddt'):.1f}" if isinstance(job.get("plddt"), (int, float)) else "—", style={"fontFamily": "monospace", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"})], style={"borderBottom": "1px solid #f5f5f5"}))
-    th = {"padding": "3px 5px", "fontSize": "10px", "color": "#7f8c8d", "fontWeight": "600", "textAlign": "left"}
+        rows.append(html.Tr([html.Td(sid[:16] + ("…" if len(sid) > 16 else ""), title=sid, style={"fontFamily": "monospace", "fontSize": "10px", "padding": "3px 5px"}), html.Td(typ, title=typ, style={"fontSize": "9px", "padding": "3px 5px"}), html.Td(status, style={"fontSize": "10px", "fontWeight": "600", "color": colors.get(status, "var(--text-muted)"), "padding": "3px 5px"}), html.Td(f"{job.get('ptm'):.3f}" if isinstance(job.get("ptm"), (int, float)) else "—", style={"fontFamily": "monospace", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(f"{job.get('plddt'):.1f}" if isinstance(job.get("plddt"), (int, float)) else "—", style={"fontFamily": "monospace", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"})], style={"borderBottom": "1px solid var(--border-soft)"}))
+    th = {"padding": "3px 5px", "fontSize": "10px", "color": "var(--text-muted)", "fontWeight": "600", "textAlign": "left"}
     return html.Table([html.Thead(html.Tr([html.Th("ID", style=th), html.Th("Type", style=th), html.Th("Status", style=th), html.Th("pTM", style={**th, "textAlign": "right"}), html.Th("pLDDT", style={**th, "textAlign": "right"})])), html.Tbody(rows)], style={"width": "100%", "borderCollapse": "collapse"})
 
 
@@ -609,21 +623,241 @@ def make_rmsd_results_table(results: list[dict]):
     for r in results:
         rmsd = r.get("rmsd")
         rmsd_s = f"{rmsd:.3f}" if isinstance(rmsd, (int, float)) and not np.isnan(rmsd) else "—"
-        rows.append(html.Tr([html.Td(r.get("query_id", ""), style={"fontFamily": "monospace", "fontSize": "10px", "padding": "3px 5px"}), html.Td(str(r.get("query_rank", 0)), style={"fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(str(r.get("n_aligned", "")), style={"fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(rmsd_s, style={"fontFamily": "monospace", "fontWeight": "600", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(r.get("method", ""), style={"fontSize": "9px", "padding": "3px 5px"}), html.Td("✓ cached" if r.get("cached") else "", style={"fontSize": "9px", "color": "#27ae60", "padding": "3px 5px"})], style={"borderBottom": "1px solid #f5f5f5"}))
-    th = {"padding": "3px 5px", "fontSize": "10px", "color": "#7f8c8d", "fontWeight": "600", "textAlign": "left"}
+        rows.append(html.Tr([html.Td(r.get("query_id", ""), style={"fontFamily": "monospace", "fontSize": "10px", "padding": "3px 5px"}), html.Td(str(r.get("query_rank", 0)), style={"fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(str(r.get("n_aligned", "")), style={"fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(rmsd_s, style={"fontFamily": "monospace", "fontWeight": "600", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(r.get("method", ""), style={"fontSize": "9px", "padding": "3px 5px"}), html.Td("✓ cached" if r.get("cached") else "", style={"fontSize": "9px", "color": "var(--success)", "padding": "3px 5px"})], style={"borderBottom": "1px solid var(--border-soft)"}))
+    th = {"padding": "3px 5px", "fontSize": "10px", "color": "var(--text-muted)", "fontWeight": "600", "textAlign": "left"}
     return html.Table([html.Thead(html.Tr([html.Th("Query", style=th), html.Th("Rank", style={**th, "textAlign": "right"}), html.Th("Aligned", style={**th, "textAlign": "right"}), html.Th("RMSD Å", style={**th, "textAlign": "right"}), html.Th("Method", style=th), html.Th("", style=th)])), html.Tbody(rows)], style={"width": "100%", "borderCollapse": "collapse"})
+
+
+SSE_INDEX_STRING = """<!DOCTYPE html>
+<html>
+<head>
+{%metas%}
+<title>{%title%}</title>
+{%favicon%}
+{%css%}
+<style>
+:root,
+html[data-theme="clean-lab"] {
+  --page:        #f5f9f9;
+  --surface:     #fffffe;
+  --surface-2:   #e3f6f5;
+  --border:      #d2e4e4;
+  --border-soft: #e8f2f2;
+  --text:        #272343;
+  --text-muted:  #545b70;
+  --text-faint:  #9aa0b0;
+
+  --accent:      #0f7c78;
+  --accent-weak: #d3ecec;
+  --on-accent:   #fffffe;
+
+  --success:     #2e7d64;
+  --warning:     #b4622f;
+  --danger:      #c0392b;
+  --boltz:       #6b46c1;
+
+  --shadow-card: 0 1px 2px rgba(39,35,67,.05), 0 1px 3px rgba(39,35,67,.04);
+  color-scheme: light;
+}
+
+html[data-theme="dark-lab"] {
+  --page:        #14121d;
+  --surface:     #201d30;
+  --surface-2:   #2a2743;
+  --border:      #38344f;
+  --border-soft: #2a2740;
+  --text:        #ecebf4;
+  /* darkened from the previous grey so it reads on light dcc cells too */
+  --text-muted:  #c2c7d6;
+  --text-faint:  #8b90a6;
+
+  --accent:      #34c6bd;
+  --accent-weak: #143f3d;
+  --on-accent:   #15121f;
+
+  --success:     #4bbf8a;
+  --warning:     #d98b4a;
+  --danger:      #e5695f;
+  --boltz:       #a78bfa;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+
+/* Rose Quartz — light theme built from the "Happy Hues" palette. Raw palette colours
+   are noted inline; muted/faint text, weak tints and the shadow are derived from them.
+   --on-accent is the dark headline navy (not white) because #a786df is a light purple:
+   navy on it is ~6.4:1, white is ~2.8:1. */
+html[data-theme="rose-quartz"] {
+  --page:        #fec7d7;   /* Background */
+  --surface:     #efecf6;   /* pale lavender-grey fields (lightened from Secondary #d9d4e7) */
+  --surface-2:   #d9d4e7;   /* Secondary — slightly deeper inset */
+  --border:      #c7c0dd;   /* darker lavender so cards read on the tint */
+  --border-soft: #ded9ec;
+  --text:        #0e172c;   /* Headline / Paragraph */
+  --text-muted:  #3d4560;
+  --text-faint:  #8a86a0;
+
+  --accent:      #a786df;   /* Tertiary */
+  --accent-weak: #e9ddf9;
+  --on-accent:   #0e172c;   /* dark navy reads on the light-purple accent */
+
+  --success:     #2f9e73;
+  --warning:     #c9722f;
+  --danger:      #d6455f;
+  --boltz:       #6d3fc4;   /* deeper violet, distinct from --accent */
+
+  --shadow-card: 0 1px 2px rgba(14,23,44,.08), 0 1px 3px rgba(14,23,44,.06);
+  color-scheme: light;
+}
+
+/* Deep Canopy — dark teal theme from the "Happy Hues" palette. Raw palette colours
+   noted inline; faint text, weak tints, surfaces and shadow are derived. --accent is
+   the amber button colour, so --on-accent is the near-black teal (dark on light amber). */
+html[data-theme="deep-canopy"] {
+  --page:        #001e1d;   /* Stroke / Button text (near-black teal) */
+  --surface:     #004643;   /* Background (deep-teal cards) */
+  --surface-2:   #0a5a54;   /* lighter teal inset */
+  --border:      #10695f;
+  --border-soft: #0a4a44;
+  --text:        #fffffe;   /* Headline */
+  --text-muted:  #abd1c6;   /* Paragraph (sage) */
+  --text-faint:  #7fa99e;
+
+  --accent:      #f9bc60;   /* Button (amber) */
+  --accent-weak: #3f3218;   /* dark amber tint */
+  --on-accent:   #001e1d;   /* near-black teal reads on the amber accent */
+
+  --success:     #4fc98a;
+  --warning:     #e8964f;
+  --danger:      #e16162;   /* Tertiary (coral) */
+  --boltz:       #a78bfa;   /* violet, stays distinct on teal */
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+
+/* page + default text follow the theme (covers gutters too) */
+html, body { background: var(--page); color: var(--text); }
+.sse-root  { color: var(--text);
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+/* control panels rendered as cards (top-level <details> in each column) */
+.sse-root .sse-col > details {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 7px; box-shadow: var(--shadow-card);
+  padding: 6px 12px 10px; margin-bottom: 12px; }
+.sse-root .sse-col > details > summary { margin-bottom: 8px; }
+
+/* labels + option text track the theme (fixes options vanishing in Dark Lab) */
+.sse-root label, .sse-root label span { color: var(--text) !important; }
+
+/* Dash input (dash-input-container > dash-input-element + stepper buttons):
+   the container is the single white cell; the inner element contributes no box
+   (no border AND no focus outline — the outline is what created the inner box);
+   steppers hidden. Focus ring goes on the container instead. */
+.sse-root [class*="dash-input-container"] {
+  background: #ffffff !important; border: 1px solid var(--border) !important;
+  border-radius: 4px !important; box-shadow: none !important; }
+.sse-root [class*="dash-input-container"]:focus-within {
+  outline: 2px solid var(--accent); outline-offset: 0; }
+.sse-root [class*="dash-input-element"],
+.sse-root input[type=text],
+.sse-root input[type=number],
+.sse-root input[type=password] {
+  background: transparent !important; color: #1a1a1a !important;
+  border: none !important; outline: none !important; box-shadow: none !important; }
+.sse-root textarea {
+  background: #ffffff !important; color: #1a1a1a !important;
+  border: 1px solid var(--border) !important; border-radius: 4px !important; }
+.sse-root input::placeholder, .sse-root textarea::placeholder { color: #9aa0b0; }
+.sse-root [class*="dash-input-stepper"],
+.sse-root [class*="dash-stepper"] { display: none !important; }
+.sse-root input[type=number] { -moz-appearance: textfield; }
+.sse-root input[type=number]::-webkit-inner-spin-button,
+.sse-root input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Dash dropdown — closed control: white cell with dark text. Scoped to the
+   dash-dropdown-* classes ONLY, so RadioItems/Checklist (which share the generic
+   dash-options-list-option class) are left to the theme's label rule. */
+[class*="dash-dropdown"] { background: #ffffff !important; }
+[class*="dash-dropdown"] * { color: #1a1a1a !important; }
+/* Dropdown popup — always a white menu with black text, both themes.
+   Each option is a <label> and its text is a descendant node. The theme's generic
+   `.sse-root label span { color: var(--text) !important }` (light) also hits the option
+   text and, on the white menu, made it faint. Root cause is specificity, not colour: that
+   rule is (0,1,2), so any override must exceed it. We anchor on the dropdown-only
+   dash-dropdown-options container plus the <label> itself (confirmed present in devtools),
+   which reaches (0,2,1) > (0,1,2) and does NOT depend on the option carrying a
+   dash-dropdown-option class (builds vary). The container anchor keeps RadioItems /
+   Checklist — which live under dash-options-list, not dash-dropdown-options — untouched,
+   so they still read as light text on the dark panel. The unscoped variant covers builds
+   where the menu is portaled outside .sse-root. */
+[class*="dash-dropdown-options"] label,
+[class*="dash-dropdown-options"] label *,
+.sse-root [class*="dash-dropdown-options"] label,
+.sse-root [class*="dash-dropdown-options"] label * {
+  color: #1a1a1a !important; }
+
+/* checkbox / radio / range accent */
+.sse-root input[type=checkbox],
+.sse-root input[type=radio],
+.sse-root input[type=range] { accent-color: var(--accent); }
+.sse-root :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* -------------------------------------------------------------------------
+   dcc component internals. !important is used deliberately to beat dcc's
+   bundled component CSS. Verify class names in devtools if a control does not
+   pick up the theme (rc-slider = .rc-slider-*).
+   ------------------------------------------------------------------------- */
+
+/* dcc.Slider / RangeSlider (rc-slider) -> teal accent */
+.sse-root .rc-slider-rail   { background: var(--border) !important; }
+.sse-root .rc-slider-track  { background: var(--accent) !important; }
+.sse-root .rc-slider-handle { border-color: var(--accent) !important; background: var(--surface) !important; }
+.sse-root .rc-slider-handle:hover,
+.sse-root .rc-slider-handle:active,
+.sse-root .rc-slider-handle:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 4px var(--accent-weak) !important; }
+.sse-root .rc-slider-dot,
+.sse-root .rc-slider-dot-active { border-color: var(--accent) !important; }
+.sse-root .rc-slider-mark-text  { color: var(--text-faint); }
+
+/* dash Slider/RangeSlider — Radix build (.dash-slider-* classes) */
+.sse-root .dash-slider-track { background: var(--border) !important; }
+.sse-root .dash-slider-track > span,
+.sse-root .dash-slider-range,
+.sse-root [class*="dash-slider"][class*="range"] { background: var(--accent) !important; }
+.sse-root .dash-slider-thumb,
+.sse-root [class*="dash-slider-thumb"] {
+  background: var(--accent) !important; border-color: var(--accent) !important; box-shadow: none !important; }
+.sse-root .dash-slider-thumb:focus,
+.sse-root [class*="dash-slider-thumb"]:focus { box-shadow: 0 0 0 4px var(--accent-weak) !important; }
+.sse-root .dash-slider-mark,
+.sse-root .dash-slider-mark-outside-selection { color: var(--text-muted) !important; background: transparent !important; }
+
+@media (prefers-reduced-motion: reduce) { .sse-root * { transition: none !important; } }
+</style>
+</head>
+<body>
+{%app_entry%}
+<footer>
+{%config%}
+{%scripts%}
+{%renderer%}
+</footer>
+</body>
+</html>
+"""
 
 
 def build_app(entry_arg: str):
     global ENTRY
     ENTRY = resolve_entry(entry_arg)
-    warning = reload_state()
-    loaded_layers, layer_msg = layer_store.validate_layers(layer_store.read_layers(ENTRY.layers_path), _ann_df[_id_col].astype(str).tolist())
-    if layer_msg:
-        layer_store.write_layers(ENTRY.layers_path, loaded_layers)
+    warning, loaded_layers = reload_state()
     job_store.read_jobs(ENTRY.jobs_path, mark_stale=True)
 
     app = Dash(__name__, suppress_callback_exceptions=True)
+    app.index_string = SSE_INDEX_STRING
     app.title = f"SSE — {ENTRY.stem}"
 
     coord_system_options = [{"label": k, "value": k} for k in _STATE.coord_systems]
@@ -641,6 +875,7 @@ def build_app(entry_arg: str):
 
     app.layout = html.Div([
         dcc.Store(id="data-loaded-store", data=True),
+        dcc.Store(id="theme-store", data="clean-lab"),
         dcc.Store(id="reload-counter", data=0),
         dcc.Store(id="fixed-color-store", data=DEFAULT_FIXED_COLOR),
         dcc.Store(id="layers-store", data=loaded_layers),
@@ -657,27 +892,25 @@ def build_app(entry_arg: str):
         dcc.Download(id="extract-download"),
         dcc.Download(id="figure-download"),
 
-        html.Div([html.Div([html.H2("Sequence Space Explorer", style={"margin": "0", "color": "#2c3e50"}), html.Span(id="subtitle-text", children=f"Entry: {ENTRY.stem} · {_ann_df.shape[0]:,} rows · {len(_STATE.coord_cols)} coordinate column(s)", style={"color": "#7f8c8d", "fontSize": "13px"})]), html.Button("Reload datafile", id="reload-btn", n_clicks=0, style={"padding": "6px 10px", "backgroundColor": "#ecf0f1", "border": "1px solid #bdc3c7", "borderRadius": "4px", "cursor": "pointer", "fontSize": "12px"})], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "marginBottom": "16px", "borderBottom": "2px solid #ecf0f1", "paddingBottom": "10px"}),
+        html.Div([html.Div([html.H2("Sequence Space Explorer", style={"margin": "0", "color": "var(--text)"}), html.Span(id="subtitle-text", children=f"Entry: {ENTRY.stem} · {_ann_df.shape[0]:,} rows · {len(_STATE.coord_cols)} coordinate column(s)", style={"color": "var(--text-muted)", "fontSize": "13px"}), html.Span(id="reload-status", children=warning or "", style={"color": "var(--warning)", "fontSize": "12px", "marginLeft": "10px"})]), html.Div([dcc.Dropdown(id="theme-select", options=[{"label": "Clean Lab", "value": "clean-lab"}, {"label": "Dark Lab", "value": "dark-lab"}, {"label": "Rose Quartz", "value": "rose-quartz"}, {"label": "Deep Canopy", "value": "deep-canopy"}], value="clean-lab", clearable=False, persistence=True, style={"width": "150px", "fontSize": "12px", "marginRight": "10px"}), html.Button("Reload datafile", id="reload-btn", n_clicks=0, style={"padding": "6px 10px", "backgroundColor": "var(--surface-2)", "border": "1px solid var(--border)", "borderRadius": "4px", "cursor": "pointer", "fontSize": "12px"})], style={"display": "flex", "alignItems": "center"})], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "marginBottom": "16px", "borderBottom": "2px solid var(--border)", "paddingBottom": "10px"}),
 
         html.Div([
             html.Div([
-                html.Details([html.Summary("Entry", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), html.Div([html.Div(f"Entry: {ENTRY.stem}", style={"fontSize": "12px"}), html.Div(str(ENTRY.datafile_path), style={"fontSize": "10px", "color": "#888", "wordBreak": "break-all"}), html.Div(id="reload-status", children=warning or layer_msg or "", style={"fontSize": "11px", "color": "#e67e22", "marginTop": "6px"})])], open=True, style={"marginBottom": "16px"}),
-
-                html.Details([html.Summary("Coordinates", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), dcc.RadioItems(id="coord-mode", options=[{"label": " Coordinate system mode", "value": "system"}, {"label": " Advanced free-axis mode", "value": "free"}], value="system", labelStyle={"display": "block", "fontSize": "12px", "marginBottom": "3px"}), html.Div(id="coord-system-panel", children=[html.Label("Coordinate system", style={"fontSize": "12px"}), dcc.Dropdown(id="coord-system-select", options=coord_system_options, value=first_system, clearable=False, style={"fontSize": "12px", "marginBottom": "4px"}), html.Label("X axis", style={"fontSize": "12px"}), dcc.Dropdown(id="x-axis-system", options=coord_axis_options(first_system), value=_x_col, clearable=False, style={"fontSize": "12px", "marginBottom": "4px"}), html.Label("Y axis", style={"fontSize": "12px"}), dcc.Dropdown(id="y-axis-system", options=coord_axis_options(first_system), value=_y_col, clearable=False, style={"fontSize": "12px"})]), html.Div(id="coord-free-panel", children=[html.Label("X axis", style={"fontSize": "12px"}), dcc.Dropdown(id="x-axis-free", options=all_coord_opts(), value=_x_col, clearable=False, style={"fontSize": "12px", "marginBottom": "4px"}), html.Label("Y axis", style={"fontSize": "12px"}), dcc.Dropdown(id="y-axis-free", options=all_coord_opts(), value=_y_col, clearable=False, style={"fontSize": "12px"})], style={"display": "none"}), html.Div(id="coord-warning", style={"fontSize": "11px", "color": "#e67e22", "marginTop": "6px"})], open=True, style={"marginBottom": "16px"}),
+                html.Details([html.Summary("Coordinates", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), dcc.RadioItems(id="coord-mode", options=[{"label": " Coordinate system mode", "value": "system"}, {"label": " Advanced free-axis mode", "value": "free"}], value="system", labelStyle={"display": "block", "fontSize": "12px", "marginBottom": "3px"}), html.Div(id="coord-system-panel", children=[html.Label("Coordinate system", style={"fontSize": "12px"}), dcc.Dropdown(id="coord-system-select", options=coord_system_options, value=first_system, clearable=False, style={"fontSize": "12px", "marginBottom": "4px"}), html.Label("X axis", style={"fontSize": "12px"}), dcc.Dropdown(id="x-axis-system", options=coord_axis_options(first_system), value=_x_col, clearable=False, style={"fontSize": "12px", "marginBottom": "4px"}), html.Label("Y axis", style={"fontSize": "12px"}), dcc.Dropdown(id="y-axis-system", options=coord_axis_options(first_system), value=_y_col, clearable=False, style={"fontSize": "12px"})]), html.Div(id="coord-free-panel", children=[html.Label("X axis", style={"fontSize": "12px"}), dcc.Dropdown(id="x-axis-free", options=all_coord_opts(), value=_x_col, clearable=False, style={"fontSize": "12px", "marginBottom": "4px"}), html.Label("Y axis", style={"fontSize": "12px"}), dcc.Dropdown(id="y-axis-free", options=all_coord_opts(), value=_y_col, clearable=False, style={"fontSize": "12px"})], style={"display": "none"}), html.Div(id="coord-warning", style={"fontSize": "11px", "color": "var(--warning)", "marginTop": "6px"})], open=True, style={"marginBottom": "16px"}),
 
                 html.Details([html.Summary("Appearance", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), html.P("Filtered points", style={**SECTION_STYLE, "margin": "0 0 4px 0"}), html.Label("Opacity", style={"fontSize": "12px"}), dcc.Slider(id="alpha-slider", min=0.05, max=1.0, step=0.05, value=DEFAULT_ALPHA, marks={0.05: "0.05", 0.5: "0.5", 1.0: "1"}), html.Label("Size", style={"fontSize": "12px"}), dcc.Slider(id="point-size-slider", min=2, max=20, step=1, value=DEFAULT_POINT_SIZE, marks={2: "2", 6: "6", 12: "12", 20: "20"}), html.Label("Shape", style={"fontSize": "12px"}), dcc.Dropdown(id="marker-symbol", options=MARKER_SYMBOL_OPTIONS, value=DEFAULT_SYMBOL, clearable=False, style={"fontSize": "12px", "marginBottom": "6px"}), html.P("Background points", style={**SECTION_STYLE, "margin": "14px 0 4px 0"}), html.Label("Size", style={"fontSize": "12px"}), dcc.Slider(id="bg-size-slider", min=1, max=12, step=1, value=DEFAULT_BG_SIZE, marks={1:"1",4:"4",8:"8",12:"12"}), html.P("Query markers", style={**SECTION_STYLE, "margin": "14px 0 4px 0"}), html.Label("Opacity", style={"fontSize":"12px"}), dcc.Slider(id="marker-alpha-slider", min=0.05, max=1.0, step=0.05, value=DEFAULT_MARKER_ALPHA, marks={0.05:"0.05",0.5:"0.5",1.0:"1"}), html.Label("Size", style={"fontSize":"12px"}), dcc.Slider(id="marker-size-slider", min=6, max=40, step=1, value=DEFAULT_MARKER_SIZE, marks={6:"6",14:"14",28:"28",40:"40"}), html.Label("Position", style={"fontSize":"12px"}), dcc.RadioItems(id="marker-mode", options=[{"label":" On top","value":"top"},{"label":" Below overlays","value":"bottom"},{"label":" Hide","value":"none"}], value=DEFAULT_MARKER_MODE, labelStyle={"display":"block","fontSize":"13px"}), html.P("Working filter position", style={**SECTION_STYLE, "margin": "14px 0 4px 0"}), dcc.RadioItems(id="wf-position", options=[{"label":" On top of saved layers","value":"top"},{"label":" Below saved layers","value":"bottom"}], value=DEFAULT_WF_POSITION, labelStyle={"display":"block","fontSize":"13px"})], open=False, style={"marginBottom": "16px"}),
 
                 html.Details([html.Summary("Colour", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), dcc.RadioItems(id="color-mode", options=[{"label":" Fixed color","value":"fixed"},{"label":" Continuous","value":"continuous"}], value=DEFAULT_COLOR_MODE, labelStyle={"display":"block","fontSize":"13px"}), html.Div(id="fixed-color-panel", children=[html.Label("Pick a color", style={"fontSize":"12px"}), html.Div([html.Div(id={"type":"color-chip","color":c}, style={"width":"22px","height":"22px","backgroundColor":c,"borderRadius":"3px","cursor":"pointer","border":"2px solid transparent","display":"inline-block","marginRight":"4px","marginBottom":"4px"}) for c in FIXED_COLOR_OPTIONS])]), html.Div(id="continuous-color-panel", children=[html.Label("Color by", style={"fontSize":"12px"}), dcc.Dropdown(id="cont-color-col", options=[{"label":c,"value":c} for c in cont_cols], value=cont_cols[0] if cont_cols else None, clearable=False, style={"fontSize":"13px","marginBottom":"6px"}), html.Label("Colormap", style={"fontSize":"12px"}), dcc.Dropdown(id="colormap-select", options=[{"label":c,"value":c} for c in COLORMAP_OPTIONS], value=DEFAULT_COLORMAP, clearable=False, style={"fontSize":"13px","marginBottom":"6px"}), dcc.Checklist(id="colormap-reversed", options=[{"label":html.Span(" Reverse colormap", style={"fontSize":"12px"}),"value":"reversed"}], value=[]), html.Label("Color range", style={"fontSize":"12px"}), dcc.RadioItems(id="color-range-mode", options=[{"label":" Global","value":"global"},{"label":" Subset","value":"subset"}], value=DEFAULT_COLOR_RANGE, labelStyle={"display":"block","fontSize":"12px"})], style={"display":"none"})], open=True, style={"marginBottom":"16px"}),
 
                 html.Details([html.Summary("Filters", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), html.Div(id="filter-panel", children=make_filter_panel())], open=True, style={"marginBottom":"16px"}),
-                html.Details([html.Summary("Search by ID", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Checklist(id="id-search-enabled", options=[{"label":html.Span(" Enable ID/name search", style=LABEL_STYLE),"value":"on"}], value=[]), html.Div(id="id-search-control", children=[dcc.Textarea(id="id-search-input", placeholder="IDs separated by commas", style={"width":"100%","fontSize":"12px","minHeight":"60px","fontFamily":"monospace"}), html.Div(id="id-search-status", style={"fontSize":"11px","marginTop":"4px","color":"#555"})], style={"display":"none", **CONTROL_WRAPPER})], open=False, style={"marginBottom":"16px"}),
-                html.Details([html.Summary("Save layer", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Input(id="layer-name-input", type="text", placeholder="Auto-generated if blank", style={"width":"100%","fontSize":"12px","marginBottom":"8px"}), html.Button("Save layer", id="save-layer-btn", n_clicks=0, style={"width":"100%","padding":"6px","backgroundColor":"#2c3e50","color":"white","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"13px"}), html.Div(id="save-layer-status", style={"fontSize":"11px","marginTop":"6px","color":"#555"})], open=True, style={"marginBottom":"16px"}),
+                html.Details([html.Summary("Search by ID", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Checklist(id="id-search-enabled", options=[{"label":html.Span(" Enable ID/name search", style=LABEL_STYLE),"value":"on"}], value=[]), html.Div(id="id-search-control", children=[dcc.Textarea(id="id-search-input", placeholder="IDs separated by commas", style={"width":"100%","fontSize":"12px","minHeight":"60px","fontFamily":"monospace"}), html.Div(id="id-search-status", style={"fontSize":"11px","marginTop":"4px","color":"var(--text-muted)"})], style={"display":"none", **CONTROL_WRAPPER})], open=False, style={"marginBottom":"16px"}),
+                html.Details([html.Summary("Save layer", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Input(id="layer-name-input", type="text", placeholder="Auto-generated if blank", style={"width":"100%","fontSize":"12px","marginBottom":"8px"}), html.Button("Save layer", id="save-layer-btn", n_clicks=0, style={"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"13px"}), html.Div(id="save-layer-status", style={"fontSize":"11px","marginTop":"6px","color":"var(--text-muted)"})], open=True, style={"marginBottom":"16px"}),
                 html.Details([html.Summary("Column settings", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), html.Button("Rebuild filter panel", id="rebuild-filters-btn", n_clicks=0, style={"width":"100%","padding":"5px","fontSize":"12px","marginBottom":"8px"}), html.Div(id="col-settings-panel", children=make_col_settings_panel())], open=False, style={"marginBottom":"16px"}),
-            ], style={"width": "290px", "minWidth": "270px", "flexShrink": "0", "overflowY": "auto", "maxHeight": "90vh", "paddingRight": "12px", "borderRight": "1px solid #ecf0f1"}),
+            ], className="sse-col", style={"width": "290px", "minWidth": "270px", "flexShrink": "0", "overflowY": "auto", "maxHeight": "90vh", "paddingRight": "12px"}),
 
-            html.Div([html.Div([html.Span(id="point-count", style={"fontSize":"12px","color":"#7f8c8d"}), html.Button("👁", id="wf-toggle-btn", n_clicks=0, title="Show/hide working filter", style={"background":"none","border":"none","cursor":"pointer","fontSize":"14px","marginLeft":"8px"})], style={"display":"flex","alignItems":"center","marginBottom":"6px"}), html.Div([html.Span(id="selection-count", children="No sequences selected", style={"fontSize":"12px","color":"#7f8c8d","flexGrow":"1"}), html.Div([html.Div(style={"width":"16px","height":"16px","backgroundColor":c,"borderRadius":"3px","cursor":"pointer","display":"inline-block","marginRight":"3px","border":"2px solid #ccc"}, id={"type":"sel-color-chip","color":c}, title=c) for c in SELECTION_COLOR_OPTIONS], style={"display":"inline-flex","alignItems":"center","marginRight":"6px"}), html.Button("Clear", id="clear-selection-btn", n_clicks=0, style={"fontSize":"11px","padding":"2px 6px","marginRight":"4px"}), html.Button("→ Working layer", id="selection-to-wl-btn", n_clicks=0, style={"fontSize":"11px","padding":"2px 6px"})], style={"display":"flex","alignItems":"center","marginBottom":"6px","padding":"4px 6px","backgroundColor":"#f8f9fa","borderRadius":"4px","border":"1px solid #ecf0f1"}), dcc.Graph(id="latent-graph", style={"height":"75vh"}, config={"displaylogo":False,"scrollZoom":True,"modeBarButtonsToAdd":["lasso2d","select2d"]}), html.Div(id="click-details", children="Click a point to show details here.", style={"marginTop":"16px","padding":"14px","border":"1px solid #ecf0f1","borderRadius":"8px","fontSize":"13px","minHeight":"60px"}), html.Div(id="load-warning", style={"marginTop":"8px","fontSize":"11px","color":"#e67e22"})], style={"flexGrow":"1","minWidth":"0","paddingLeft":"16px","paddingRight":"16px"}),
+            html.Div([html.Div([html.Span(id="point-count", style={"fontSize":"12px","color":"var(--text-muted)"}), html.Button("👁", id="wf-toggle-btn", n_clicks=0, title="Show/hide working filter", style={"background":"none","border":"none","cursor":"pointer","fontSize":"14px","marginLeft":"8px"})], style={"display":"flex","alignItems":"center","marginBottom":"6px"}), html.Div([html.Span(id="selection-count", children="No sequences selected", style={"fontSize":"12px","color":"var(--text-muted)","flexGrow":"1"}), html.Div([html.Div(style={"width":"16px","height":"16px","backgroundColor":c,"borderRadius":"3px","cursor":"pointer","display":"inline-block","marginRight":"3px","border":"2px solid var(--border)"}, id={"type":"sel-color-chip","color":c}, title=c) for c in SELECTION_COLOR_OPTIONS], style={"display":"inline-flex","alignItems":"center","marginRight":"6px"}), html.Button("Clear", id="clear-selection-btn", n_clicks=0, style={"fontSize":"11px","padding":"3px 8px","marginRight":"4px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"4px","cursor":"pointer"}), html.Button("→ Working layer", id="selection-to-wl-btn", n_clicks=0, style={"fontSize":"11px","padding":"3px 8px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"4px","cursor":"pointer"})], style={"display":"flex","alignItems":"center","marginBottom":"6px","padding":"6px 8px","backgroundColor":"var(--surface)","borderRadius":"6px","border":"1px solid var(--border)"}), dcc.Graph(id="latent-graph", style={"height":"75vh"}, config={"displaylogo":False,"scrollZoom":True,"modeBarButtonsToAdd":["lasso2d","select2d"]}), html.Div(id="click-details", children="Click a point to show details here.", style={"marginTop":"16px","padding":"14px","backgroundColor":"var(--surface)","border":"1px solid var(--border)","borderRadius":"8px","fontSize":"13px","minHeight":"60px"}), html.Div(id="load-warning", style={"marginTop":"8px","fontSize":"11px","color":"var(--warning)"})], style={"flexGrow":"1","minWidth":"0","paddingLeft":"16px","paddingRight":"16px"}),
 
-            html.Div([html.Div([html.Span("Saved layers", style={"fontWeight":"bold","fontSize":"14px","color":"#2c3e50"}), html.Button("Clear all", id="clear-layers-btn", n_clicks=0, style={"background":"none","border":"none","color":"#e74c3c","cursor":"pointer","fontSize":"11px","float":"right"})], style={"marginBottom":"8px","borderBottom":"1px solid #ecf0f1","paddingBottom":"6px"}), html.Div(id="layers-sidebar", children=make_sidebar(loaded_layers)), html.Button("⬇ Extract visible layers", id="extract-btn", n_clicks=0, style={"width":"100%","padding":"5px","backgroundColor":"#2980b9","color":"white","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"6px","marginTop":"8px"}), html.Div(id="extract-status", style={"fontSize":"11px","color":"#555","marginBottom":"8px"}), html.Details([
+            html.Div([html.Div([html.Span("Saved layers", style={"fontWeight":"bold","fontSize":"14px","color":"var(--text)"}), html.Button("Clear all", id="clear-layers-btn", n_clicks=0, style={"background":"none","border":"none","color":"var(--danger)","cursor":"pointer","fontSize":"11px","float":"right"})], style={"marginBottom":"8px","borderBottom":"1px solid var(--border)","paddingBottom":"6px"}), html.Div(id="layers-sidebar", children=make_sidebar(loaded_layers)), html.Button("⬇ Extract visible layers", id="extract-btn", n_clicks=0, style={"width":"100%","padding":"5px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"6px","marginTop":"8px"}), html.Div(id="extract-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"8px"}), html.Details([
                     html.Summary("Export figure", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"6px"}),
                     html.Label("Format", style={"fontSize":"11px"}),
                     dcc.RadioItems(id="export-format", options=EXPORT_FORMAT_OPTIONS, value="png", labelStyle={"display":"inline-block","fontSize":"12px","marginRight":"8px"}, style={"marginBottom":"4px"}),
@@ -689,37 +922,41 @@ def build_app(entry_arg: str):
                     dcc.Input(id="export-axis-color", type="text", value="#000000", debounce=True, style={"width":"100%","fontSize":"12px","marginBottom":"4px","boxSizing":"border-box"}),
                     html.Label("Axis label colour (hex)", style={"fontSize":"11px"}),
                     dcc.Input(id="export-label-color", type="text", value="#000000", debounce=True, style={"width":"100%","fontSize":"12px","marginBottom":"4px","boxSizing":"border-box"}),
-                    html.Label("Gridline colour (hex)", style={"fontSize":"11px"}),
-                    dcc.Input(id="export-grid-color", type="text", value="#000000", debounce=True, style={"width":"100%","fontSize":"12px","marginBottom":"4px","boxSizing":"border-box"}),
                     html.Label("Marker edge colour (hex)", style={"fontSize":"11px"}),
                     dcc.Input(id="export-edge-color", type="text", value="#000000", debounce=True, style={"width":"100%","fontSize":"12px","marginBottom":"4px","boxSizing":"border-box"}),
                     html.Label("Background colour (hex, ignored if transparent)", style={"fontSize":"11px"}),
                     dcc.Input(id="export-bg-color", type="text", value="#ffffff", debounce=True, style={"width":"100%","fontSize":"12px","marginBottom":"4px","boxSizing":"border-box"}),
-                    html.Div([html.Label("Width × height (px)", style={"fontSize":"11px", "flexGrow":"1"}), html.Button("Reset", id="export-size-reset", n_clicks=0, title="Reset to 1200 × 800 px", style={"fontSize":"10px", "padding":"1px 6px", "border":"1px solid #bdc3c7", "backgroundColor":"#ecf0f1", "borderRadius":"3px", "cursor":"pointer"})], style={"display":"flex", "alignItems":"center", "gap":"6px", "marginBottom":"2px"}),
+                    html.Div([html.Label("Width × height (px)", style={"fontSize":"11px", "flexGrow":"1"}), html.Button("Reset", id="export-size-reset", n_clicks=0, title="Reset to 1200 × 800 px", style={"fontSize":"10px", "padding":"1px 6px", "border":"1px solid var(--border)", "backgroundColor":"var(--surface-2)", "borderRadius":"3px", "cursor":"pointer"})], style={"display":"flex", "alignItems":"center", "gap":"6px", "marginBottom":"2px"}),
                     html.Div([
                         dcc.Input(id="export-width", type="number", value=EXPORT_DEFAULT_WIDTH, min=300, max=8000, step=50, debounce=True, style={"width":"48%","fontSize":"12px","marginRight":"4%","boxSizing":"border-box"}),
                         dcc.Input(id="export-height", type="number", value=EXPORT_DEFAULT_HEIGHT, min=300, max=8000, step=50, debounce=True, style={"width":"48%","fontSize":"12px","boxSizing":"border-box"}),
                     ], style={"display":"flex","marginBottom":"6px"}),
                     html.Label("Save to", style={"fontSize":"11px"}),
                     dcc.RadioItems(id="export-destination", options=[{"label":html.Span(" Browser download", style={"fontSize":"12px"}),"value":"browser"},{"label":html.Span(" Entry figures/", style={"fontSize":"12px"}),"value":"server"}], value="browser", labelStyle={"display":"block","marginBottom":"2px"}, inputStyle={"cursor":"pointer","marginRight":"4px"}, style={"marginBottom":"6px","marginTop":"2px"}),
-                    html.Button("📷 Save figure", id="export-btn", n_clicks=0, style={"width":"100%","padding":"5px","backgroundColor":"#27ae60","color":"white","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"4px"}),
-                    html.Div(id="export-status", style={"fontSize":"11px","color":"#555","wordBreak":"break-all"})
-                ], open=False, style={"marginBottom":"10px","borderTop":"1px solid #ecf0f1","paddingTop":"8px"}),
+                    html.Button("📷 Save figure", id="export-btn", n_clicks=0, style={"width":"100%","padding":"5px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"4px"}),
+                    html.Div(id="export-status", style={"fontSize":"11px","color":"var(--text-muted)","wordBreak":"break-all"})
+                ], open=False, style={"marginBottom":"12px"}),
 
                 html.Details([html.Summary("Boltz-2 structure prediction", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"8px"}), html.Label("NVIDIA API key", style={"fontSize":"11px"}), dcc.Input(id="boltz-api-key", type="password", placeholder="nvapi-…", style={"width":"100%","fontSize":"11px","fontFamily":"monospace","marginBottom":"4px"}), html.Button("Check API key", id="boltz-check-key-btn", n_clicks=0, style={"width":"100%","padding":"4px","fontSize":"11px","marginBottom":"4px"}), html.Div(id="boltz-key-status", style={"fontSize":"11px","marginBottom":"8px","minHeight":"14px"}), dcc.Checklist(id="boltz-use-msa", options=[{"label":html.Span(" Use MSA (recommended)", style={"fontSize":"12px"}),"value":"on"}], value=["on"], style={"marginBottom":"8px"}), html.Label("Substrate SMILES (optional)", style={"fontSize":"11px"}), dcc.Textarea(id="boltz-smiles", placeholder="One SMILES per line", style={"width":"100%","fontSize":"11px","fontFamily":"monospace","resize":"vertical","minHeight":"58px"}), html.Label("Ligand label (optional)", style={"fontSize":"11px"}), dcc.Input(id="boltz-smiles-label", type="text", placeholder="e.g. UDP-Glc", style={"width":"100%","fontSize":"11px","marginBottom":"6px"}), html.Details([
-                    html.Summary("Prediction parameters", style={"fontSize":"11px","cursor":"pointer","color":"#555","marginBottom":"6px"}),
+                    html.Summary("Prediction parameters", style={"fontSize":"11px","cursor":"pointer","color":"var(--text-muted)","marginBottom":"6px"}),
                     html.Div([
                         html.Div([html.Label("Recycling steps", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-recycling-steps", type="number", value=3, min=1, max=10, step=1, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"4px"}),
                         html.Div([html.Label("Sampling steps", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-sampling-steps", type="number", value=200, min=10, max=500, step=10, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"4px"}),
                         html.Div([html.Label("Diffusion samples", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-diffusion-samples", type="number", value=5, min=1, max=10, step=1, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"4px"}),
                         html.Div([html.Label("Step scale", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-step-scale", type="number", value=1.638, min=0.1, max=5, step=0.001, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"2px"}),
                     ], style={"width":"100%"}),
-                ], open=False, style={"marginBottom":"8px"}), dcc.Checklist(id="boltz-force-rerun", options=[{"label":html.Span(" Force re-run (ignore cache)", style={"fontSize":"12px"}),"value":"on"}], value=[]), html.Button("⚗ Send to Boltz-2", id="boltz-submit-btn", n_clicks=0, disabled=True, style={"width":"100%","padding":"6px","backgroundColor":"#8e44ad","color":"white","border":"none","borderRadius":"4px","cursor":"not-allowed","fontSize":"12px","marginBottom":"4px","opacity":"0.4"}), html.Div(id="boltz-submit-status", style={"fontSize":"11px","color":"#555","marginBottom":"6px"}), html.Div(id="boltz-summary", children=boltz_summary(_boltz_jobs), style={"fontSize":"11px","color":"#7f8c8d","marginBottom":"6px","fontStyle":"italic"}), html.Div(id="boltz-job-table", children=make_job_table(_boltz_jobs), style={"fontSize":"11px","overflowX":"auto"})], open=False, style={"marginTop":"12px","borderTop":"1px solid #ecf0f1","paddingTop":"8px"}),
+                ], open=False, style={"marginBottom":"8px"}), dcc.Checklist(id="boltz-force-rerun", options=[{"label":html.Span(" Force re-run (ignore cache)", style={"fontSize":"12px"}),"value":"on"}], value=[]), html.Button("⚗ Send to Boltz-2", id="boltz-submit-btn", n_clicks=0, disabled=True, style={"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"not-allowed","fontSize":"12px","marginBottom":"4px","opacity":"0.4"}), html.Div(id="boltz-submit-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"6px"}), html.Div(id="boltz-summary", children=boltz_summary(_boltz_jobs), style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"6px","fontStyle":"italic"}), html.Div(id="boltz-job-table", children=make_job_table(_boltz_jobs), style={"fontSize":"11px","overflowX":"auto"})], open=False, style={"marginBottom":"12px"}),
 
-                html.Details([html.Summary("RMSD analysis", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"8px"}), html.Div(id="rmsd-struct-list", style={"fontSize":"11px","color":"#555","marginBottom":"4px"}), html.Label("Reference structure", style={"fontSize":"11px"}), dcc.Dropdown(id="rmsd-reference-select", placeholder="Select reference…", options=[], clearable=False, style={"fontSize":"11px","marginBottom":"4px"}), html.Div([html.Label("Reference rank", style={"fontSize":"11px","marginRight":"6px"}), dcc.Input(id="rmsd-ref-rank", type="number", value=0, min=0, step=1, debounce=True, style={"width":"55px","fontSize":"11px"})], style={"display":"flex","alignItems":"center","marginBottom":"8px"}), html.Label("Scope", style={"fontSize":"11px"}), dcc.RadioItems(id="rmsd-scope", options=[{"label":html.Span(" All completed apo structures", style={"fontSize":"12px"}),"value":"all"},{"label":html.Span(" Selected sequences only", style={"fontSize":"12px"}),"value":"selected"}], value="all", labelStyle={"display":"block","fontSize":"12px"}), html.Details([html.Summary("Advanced options — per-sequence rank", style={"fontSize":"11px","cursor":"pointer","color":"#555"}), html.Div(id="rmsd-rank-overrides", style={"fontSize":"11px"}), dcc.Store(id="rmsd-rank-store", data={}), dcc.Store(id="rmsd-seq-store", data=[])], open=False, style={"marginBottom":"8px"}), html.Label("Alignment method", style={"fontSize":"11px"}), dcc.RadioItems(id="rmsd-method", options=[{"label":html.Span(" Sequence-guided (super)", style={"fontSize":"12px"}),"value":"seq"},{"label":html.Span(" Structure-based (CE)", style={"fontSize":"12px"}),"value":"ce"},{"label":html.Span(" Both", style={"fontSize":"12px"}),"value":"both"}], value="seq", labelStyle={"display":"block","fontSize":"12px"}), html.Button("Calculate RMSDs", id="rmsd-calc-btn", n_clicks=0, style={"width":"100%","padding":"6px","backgroundColor":"#2980b9","color":"white","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"4px"}), html.Div(id="rmsd-status", style={"fontSize":"11px","color":"#555","marginBottom":"6px","minHeight":"14px"}), html.Div(id="rmsd-results-table", style={"fontSize":"11px","overflowX":"auto"})], open=False, style={"marginTop":"12px","borderTop":"1px solid #ecf0f1","paddingTop":"8px"})
-            ], style={"width":"235px","minWidth":"215px","flexShrink":"0","borderLeft":"1px solid #ecf0f1","paddingLeft":"12px","overflowY":"auto","maxHeight":"90vh"}),
+                html.Details([html.Summary("RMSD analysis", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"8px"}), html.Div(id="rmsd-struct-list", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"4px"}), html.Label("Reference structure", style={"fontSize":"11px"}), dcc.Dropdown(id="rmsd-reference-select", placeholder="Select reference…", options=[], clearable=False, style={"fontSize":"11px","marginBottom":"4px"}), html.Div([html.Label("Reference rank", style={"fontSize":"11px","marginRight":"6px"}), dcc.Input(id="rmsd-ref-rank", type="number", value=0, min=0, step=1, debounce=True, style={"width":"55px","fontSize":"11px"})], style={"display":"flex","alignItems":"center","marginBottom":"8px"}), html.Label("Scope", style={"fontSize":"11px"}), dcc.RadioItems(id="rmsd-scope", options=[{"label":html.Span(" All completed apo structures", style={"fontSize":"12px"}),"value":"all"},{"label":html.Span(" Selected sequences only", style={"fontSize":"12px"}),"value":"selected"}], value="all", labelStyle={"display":"block","fontSize":"12px"}), html.Details([html.Summary("Advanced options — per-sequence rank", style={"fontSize":"11px","cursor":"pointer","color":"var(--text-muted)"}), html.Div(id="rmsd-rank-overrides", style={"fontSize":"11px"}), dcc.Store(id="rmsd-rank-store", data={}), dcc.Store(id="rmsd-seq-store", data=[])], open=False, style={"marginBottom":"8px"}), html.Label("Alignment method", style={"fontSize":"11px"}), dcc.RadioItems(id="rmsd-method", options=[{"label":html.Span(" Sequence-guided (super)", style={"fontSize":"12px"}),"value":"seq"},{"label":html.Span(" Structure-based (CE)", style={"fontSize":"12px"}),"value":"ce"},{"label":html.Span(" Both", style={"fontSize":"12px"}),"value":"both"}], value="seq", labelStyle={"display":"block","fontSize":"12px"}), html.Button("Calculate RMSDs", id="rmsd-calc-btn", n_clicks=0, style={"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"4px"}), html.Div(id="rmsd-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"6px","minHeight":"14px"}), html.Div(id="rmsd-results-table", style={"fontSize":"11px","overflowX":"auto"})], open=False, style={"marginBottom":"12px"})
+            ], className="sse-col", style={"width":"235px","minWidth":"215px","flexShrink":"0","paddingLeft":"12px","overflowY":"auto","maxHeight":"90vh"}),
         ], style={"display":"flex","gap":"0","alignItems":"flex-start"})
-    ], style={"padding":"20px","fontFamily":"sans-serif","maxWidth":"1900px","margin":"0 auto"})
+    ], id="app-root", className="sse-root", style={"padding":"20px","fontFamily":"sans-serif","maxWidth":"1900px","margin":"0 auto"})
+
+    app.clientside_callback(
+        "function(v){ v = v || 'clean-lab'; document.documentElement.setAttribute('data-theme', v); return v; }",
+        Output("theme-store", "data"),
+        Input("theme-select", "value"),
+    )
 
     # ---------------- callbacks ----------------
     @app.callback(Output("fixed-color-panel", "style"), Output("continuous-color-panel", "style"), Input("color-mode", "value"))
@@ -750,14 +987,10 @@ def build_app(entry_arg: str):
 
     @app.callback(Output("filter-panel", "children", allow_duplicate=True), Output("col-settings-panel", "children", allow_duplicate=True), Output("subtitle-text", "children"), Output("reload-status", "children"), Output("reload-counter", "data"), Output("layers-store", "data", allow_duplicate=True), Output("filter-pending-store", "data", allow_duplicate=True), Input("reload-btn", "n_clicks"), State("reload-counter", "data"), State("layers-store", "data"), prevent_initial_call=True)
     def manual_reload(n, counter, current_layers):
-        warn = reload_state()
+        warn, cleaned_layers = reload_state()
         with _STATE_LOCK:
-            valid_ids = _ann_df[_id_col].astype(str).tolist()
             subtitle = f"Entry: {ENTRY.stem} · {_ann_df.shape[0]:,} rows · {len(_STATE.coord_cols)} coordinate column(s)"
-        cleaned_layers, layer_msg = layer_store.validate_layers(current_layers or [], valid_ids)
-        if cleaned_layers != (current_layers or []):
-            layer_store.write_layers(ENTRY.layers_path, cleaned_layers)
-        status = " · ".join(x for x in [warn, layer_msg, "Reloaded datafile."] if x)
+        status = " · ".join(x for x in [warn, "Reloaded datafile."] if x)
         # Clear dynamic/pattern-matched panels first. A second callback rebuilds
         # them after Dash has removed the old ALL-pattern components from the DOM.
         # Updating them in one callback can trigger Dash renderer JS errors
@@ -1092,7 +1325,6 @@ def build_app(entry_arg: str):
         State("export-transparent", "value"),
         State("export-axis-color", "value"),
         State("export-label-color", "value"),
-        State("export-grid-color", "value"),
         State("export-edge-color", "value"),
         State("export-bg-color", "value"),
         State("export-width", "value"),
@@ -1101,7 +1333,7 @@ def build_app(entry_arg: str):
         prevent_initial_call=True,
     )
     def export_figure(n, figure, fmt, dpi, legend_val, transparent_val,
-                      axis_color, label_color, grid_color, edge_color, bg_color,
+                      axis_color, label_color, edge_color, bg_color,
                       width, height, dest):
         if not n or figure is None:
             return no_update, no_update
@@ -1114,7 +1346,6 @@ def build_app(entry_arg: str):
             height = int(height or EXPORT_DEFAULT_HEIGHT)
             axis_col = _valid_hex(axis_color, "#000000")
             label_col = _valid_hex(label_color, axis_col)
-            grid_col = _valid_hex(grid_color, "#000000")
             edge_col = _valid_hex(edge_color, "#000000")
             bg_col = _valid_hex(bg_color, "#ffffff")
             transparent = bool(transparent_val and "on" in transparent_val)
@@ -1132,8 +1363,8 @@ def build_app(entry_arg: str):
                     tickcolor=axis_col,
                     tickfont=dict(color=label_col),
                     title=dict(font=dict(color=label_col)),
-                    gridcolor=grid_col,
-                    zerolinecolor=grid_col,
+                    showgrid=False,
+                    zeroline=False,
                 ),
                 yaxis=dict(
                     color=axis_col,
@@ -1141,8 +1372,8 @@ def build_app(entry_arg: str):
                     tickcolor=axis_col,
                     tickfont=dict(color=label_col),
                     title=dict(font=dict(color=label_col)),
-                    gridcolor=grid_col,
-                    zerolinecolor=grid_col,
+                    showgrid=False,
+                    zeroline=False,
                 ),
             )
 
@@ -1173,7 +1404,7 @@ def build_app(entry_arg: str):
     @app.callback(Output("boltz-key-status", "children"), Output("boltz-key-status", "style"), Output("boltz-key-valid-store", "data"), Input("boltz-check-key-btn", "n_clicks"), State("boltz-api-key", "value"), prevent_initial_call=True)
     def check_key(n, key):
         ok, msg = boltz_backend.validate_api_key(key or "")
-        color = "#27ae60" if ok else "#e74c3c"
+        color = "var(--success)" if ok else "var(--danger)"
         return ("✓ " if ok else "✗ ") + msg, {"fontSize":"11px","marginBottom":"8px","minHeight":"14px","color":color}, ok
 
     @app.callback(Output("boltz-key-valid-store", "data", allow_duplicate=True), Output("boltz-key-status", "children", allow_duplicate=True), Input("boltz-api-key", "value"), prevent_initial_call=True)
@@ -1182,7 +1413,7 @@ def build_app(entry_arg: str):
 
     @app.callback(Output("boltz-submit-btn", "disabled"), Output("boltz-submit-btn", "style"), Input("boltz-key-valid-store", "data"), Input("boltz-clicked-id-store", "data"))
     def boltz_button_state(valid, clicked):
-        base = {"width":"100%","padding":"6px","backgroundColor":"#8e44ad","color":"white","border":"none","borderRadius":"4px","fontSize":"12px","marginBottom":"4px"}
+        base = {"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","fontSize":"12px","marginBottom":"4px"}
         enabled = bool(valid) and bool(clicked)
         return (not enabled, {**base, "cursor":"pointer" if enabled else "not-allowed", "opacity":"1" if enabled else "0.4"})
 
@@ -1235,7 +1466,7 @@ def build_app(entry_arg: str):
                 _boltz_futures.pop(key, None)
         with _STATE_LOCK:
             before_cols = set(_ann_df.columns)
-        warn = reload_state()
+        reload_state()
         with _STATE_LOCK:
             after_cols = set(_ann_df.columns)
         completed_any = completed_any or (before_cols != after_cols)
@@ -1266,7 +1497,7 @@ def build_app(entry_arg: str):
     def refresh_rmsd_structs(_i, _r, _s, rank_store, current_ref):
         seqs = rmsd_backend.list_apo_structures(ENTRY)
         if not seqs:
-            empty = html.Div("No predicted apo structures yet.", style={"fontSize":"11px","color":"#aaa"})
+            empty = html.Div("No predicted apo structures yet.", style={"fontSize":"11px","color":"var(--text-faint)"})
             return [], None, empty, empty, {}, []
 
         rank_store = {str(k): int(v or 0) for k, v in (rank_store or {}).items()}
@@ -1289,17 +1520,17 @@ def build_app(entry_arg: str):
             max_rank = max_by_id[sid]
             overrides.append(html.Div([
                 html.Span(sid, style={"fontFamily":"monospace","fontSize":"10px","flexGrow":"1","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap","maxWidth":"120px"}),
-                html.Span(f"0-{max_rank}", style={"fontSize":"9px","color":"#aaa","marginRight":"4px"}),
+                html.Span(f"0-{max_rank}", style={"fontSize":"9px","color":"var(--text-faint)","marginRight":"4px"}),
                 dcc.Input(
                     id={"type":"rmsd-rank", "sid":sid},
                     type="number",
                     value=clean_store[sid],
                     min=0, max=max_rank, step=1, debounce=True,
-                    style={"width":"45px","fontSize":"10px","padding":"2px 4px","border":"1px solid #ddd","borderRadius":"3px"},
+                    style={"width":"45px","fontSize":"10px","padding":"2px 4px","border":"1px solid var(--border)","borderRadius":"3px"},
                 ),
             ], style={"display":"grid","gridTemplateColumns":"minmax(0, 1fr) 28px 52px","alignItems":"center","gap":"4px","marginBottom":"3px"}))
 
-        return opts, selected_ref, overrides, html.Div(f"{len(seqs)} apo structure(s) available.", style={"fontSize":"11px","color":"#555"}), clean_store, seq_ids
+        return opts, selected_ref, overrides, html.Div(f"{len(seqs)} apo structure(s) available.", style={"fontSize":"11px","color":"var(--text-muted)"}), clean_store, seq_ids
 
     @app.callback(
         Output("rmsd-rank-store", "data", allow_duplicate=True),
