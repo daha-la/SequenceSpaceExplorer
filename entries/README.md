@@ -12,11 +12,11 @@ updated by the scripts in [`scripts/`](../scripts/).
 entries/<stem>/
 ├── <stem>.sse.tsv          the datafile — the only file that matters long-term
 ├── external_data/          drop files here for merge_external.py to merge in
-├── embeddings/              cached embedding matrices + 3Di sequence cache
-├── structures/              Boltz-2 predicted structures (apo/ and holo/)
-├── msa_cache/               cached MSAs used for Boltz-2 predictions
-├── figures/                  diagnostic plots + manual exports from the visualizer
-└── logs/                     manifest, job state, saved layers, run logs
+├── embeddings/             cached embedding matrices + 3Di sequence cache
+├── structures/             Boltz-2 predicted structures (apo/ and holo/)
+├── msa_cache/              cached MSAs used for Boltz-2 predictions
+├── figures/                diagnostic plots + manual exports from the visualizer
+└── logs/                   manifest, job state, saved layers, run logs
 ```
 
 ### `<stem>.sse.tsv`
