@@ -14,6 +14,11 @@ resolving an `ENTRY` argument to a path, and `merge_columns`, the one
 function every tool uses to additively write into a datafile (left-join by
 id, never reorders/drops rows, refuses silent column collisions).
 
+Comments throughout this package cite `spec §X` — that's
+[`docs/SSE_datafile_spec.md`](../docs/SSE_datafile_spec.md), the
+formal contract for the datafile format and the guarantees `merge_columns`
+and the readers/embedders/reducers/taxonomy plug-ins rely on.
+
 ## The plug-in pattern
 
 Four areas of the codebase are deliberately built as small plug-in

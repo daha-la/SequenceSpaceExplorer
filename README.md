@@ -11,7 +11,11 @@ Everything revolves around one file format, the **`.sse.tsv` datafile** — a
 plain TSV with a header row, a `Type` row (`id` / `label` / `coordinate` per
 column), and one row per sequence. Every tool in this repo reads and/or
 additively writes that one file; nothing is ever destroyed or reordered, so
-you can always see exactly which tool contributed which column.
+you can always see exactly which tool contributed which column. The full
+contract — exact file format, per-source ID/query resolution rules, the
+merge guarantees every tool relies on — is written up in
+[`docs/SSE_datafile_spec.md`](docs/SSE_datafile_spec.md), an internal design
+document for anyone extending SSE rather than required reading for using it.
 
 ## Installation
 
@@ -193,7 +197,7 @@ full flag reference.
 | [`initial_files/`](initial_files/) | Raw source files you feed into `sse_initialization.py` (bare filenames given to scripts are looked up here). See [initial_files/README.md](initial_files/README.md). |
 | [`entries/`](entries/) | Generated output: one subfolder per entry, each holding its `.sse.tsv` datafile, provenance manifest, and caches (structures, MSAs, figures, logs). See [entries/README.md](entries/README.md). |
 | [`env/`](env/) | [`requirement.yaml`](env/requirement.yaml), the conda environment definition — see Installation above. |
-| [`docs/`](docs/) | Longer-form documentation, currently the visualizer's user guide (Markdown and Word versions). See [docs/README.md](docs/README.md). |
+| [`docs/`](docs/) | Longer-form documentation: the visualizer's user guide (Markdown and Word versions), and `SSE_datafile_spec.md` — the internal design contract behind the `spec §X` comments in the code, for anyone extending SSE. See [docs/README.md](docs/README.md). |
 
 ## Design principles
 

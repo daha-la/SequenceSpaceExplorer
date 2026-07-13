@@ -24,9 +24,13 @@ One file per `--source` you intend to use:
 
 | `--source` | Format | Requirements |
 |---|---|---|
-| `em` | Tabular TSV (EnzymeMiner selection-table export, or any similarly-shaped tabular search result) | A header row; an ID column (default `Accession`, override with `--id_col`) and a sequence column (default `Sequence`, override with `--seq_col`). A `Closest query` column, if present, is used to auto-detect query rows. |
+| `em` | Tabular TSV (EnzymeMiner selection-table export, or any similarly-shaped tabular search result) | A header row; an ID column (default `Accession`, override with `--id_col`) and a sequence column (default `Sequence`, override with `--seq_col`). |
 | `fasta` | Standard FASTA (`.fasta`/`.faa`/`.fa`/`.txt`) | One `>header` + sequence per record. The ID is taken from the first whitespace-delimited token of the header (UniProt-style `db\|accession\|name` headers are unwrapped to the accession). |
 | `fs` | Foldseek webserver JSON (the raw JSON downloadable from a Foldseek search result page) | Must contain the search's `queries` and per-database `results`/`alignments` blocks, as produced by the Foldseek webserver — not the plain-text `.m8` format. |
+
+Each source also auto-detects which row(s) get flagged as the entry's
+`query` (reference) sequences differently — see ["What 'query'
+means"](../scripts/README.md#what-query-means) in `scripts/README.md`.
 
 Both example files currently in this folder are real inputs for the two
 `entries/` examples in this repo, and are a good reference for the expected

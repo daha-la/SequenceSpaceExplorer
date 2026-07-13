@@ -56,6 +56,36 @@ The whole entry is built in a temporary directory first and only moved into
 `entries/<stem>/` once everything succeeded, so a failed or interrupted run
 never leaves a half-written entry behind.
 
+### What "query" means
+
+Every entry has a `query` column marking which rows are reference
+sequences rather than search/database hits. It's not just a label: a query
+row gets its own distinctive marker in the visualizer's plot (see the
+[visualizer guide](../docs/visualizer_guide.md#appearance)), and — per
+step 2 above — a query row can never be silently dropped for having an
+unusable sequence; creation aborts instead, on the theory that losing a
+reference sequence without telling you is worse than stopping.
+
+Which rows start out flagged `query` depends on the source, and can always
+be overridden with `--query`:
+
+- **`em`**: a row is auto-flagged as a query if its own id appears as a
+  *value* in some other row's `Closest query` column, i.e. another row
+  points to it as the closest known query. No `Closest query` column means
+  no auto-detection — every row starts unflagged unless you use `--query`.
+- **`fs`** (Foldseek): the reader looks for a hit with 100% sequence
+  identity to the search's own query sequence and flags that row. If no
+  such self-hit exists among the results, it adds one extra synthetic row
+  built from the search's own query record (so the query is always
+  represented, even if Foldseek didn't return it as a hit).
+- **`fasta`**: no auto-detection at all — nothing is flagged unless you
+  pass `--query`.
+
+`--query` always overrides whatever the reader would have auto-detected,
+matching the reader's raw identifying field as described in the flag table
+below (not the final resolved id) — see the `--query` row for exactly what
+that means per source.
+
 ### Usage
 
 ```bash

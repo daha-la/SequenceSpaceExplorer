@@ -99,8 +99,8 @@ How the working filter's points are coloured:
 
 One control per filterable label column, grouped into four kinds — SSE
 infers each column's kind automatically from its values (see
-[`sse_tools/README.md`](../sse_tools/README.md) for how), and you can
-override a wrong guess in **Column settings** below.
+**Column settings** below for exactly how), and you can override a wrong
+guess there too.
 
 - **Continuous** — a checkbox to enable it, a range slider, and matching
   min/max number boxes (typing a number and the slider stay in sync either
@@ -146,6 +146,48 @@ wrong, e.g. a numeric-looking ID column you don't want treated as
 continuous. Change a dropdown, then click **Rebuild filter panel** to apply
 your overrides (they don't take effect live as you change them, so you can
 adjust several before rebuilding).
+
+**How the automatic guess works.** Every `label` column is sorted into one
+of the five kinds above the first time it's loaded, by this rule:
+
+1. **Empty or constant columns are skipped.** No values, or only one
+   distinct value, isn't filterable on anything.
+2. **Numeric columns are Continuous** if at least 80% of their non-empty
+   values parse as a number.
+3. **Boolean-looking columns are Boolean** if every non-empty value is one
+   of `true`/`false`/`yes`/`no`/`1`/`0` (case-insensitive).
+4. Otherwise, for text columns:
+   - Date-shaped values (`YYYY-MM-DD...` in most rows) are **skipped** —
+     dates aren't currently a supported filter kind.
+   - A column that's mostly comma-separated *numbers* (not tags) is
+     **skipped** rather than treated as Tag-split.
+   - A column is **skipped** as free text if it's both high-cardinality
+     (≥80% of values are unique) and long (≥30 characters average) —
+     e.g. a description or notes field.
+   - A column with **more than 200 distinct values** is skipped — a flat
+     dropdown with hundreds of entries isn't usable — *unless* it's rescued
+     (see below).
+   - Otherwise: if ≥30% of values contain a comma, or ≥5% do *and* the
+     individual comma-separated tokens repeat across rows more than the
+     whole cell values do, it's **Tag-split** (e.g. a `Databases` column
+     listing several source databases per row). Everything else is plain
+     **Categorical**.
+
+**The 200-unique-value cutoff can be rescued.** A column skipped only for
+being high-cardinality (not for being numeric/boolean/date-like/free-text)
+is promoted back to Categorical if it "nests" under — or has nesting under
+it — another column that's already Categorical or Tag-split: at least 40%
+row coverage in both columns, and at least 98% of the time each value in
+the high-cardinality column maps to exactly one value in the partner
+column (a functional dependency, checked in both directions, so it doesn't
+matter which of the two columns is "wider"). This is how a `species` column
+with hundreds of distinct values becomes filterable once it's paired with a
+coarser `genus` or `family` column — narrowing the coarser filter first
+shrinks the rescued column's dropdown down to a handful of live values.
+It's a general nesting check, not special-cased to taxonomy columns by
+name, so it applies to any two columns with that kind of relationship. A
+high-cardinality column with no such partner stays skipped, and you can
+still promote it manually here if you want it anyway.
 
 ## 4. Center: the plot
 
@@ -206,16 +248,50 @@ render times out, the status line explains what went wrong.
 
 ### Boltz-2 structure prediction
 
-Predicts a 3D structure for one sequence at a time via the hosted Boltz-2
-API, and optionally with a bound small-molecule ligand.
+Predicts a 3D structure for **one sequence at a time** via the hosted
+Boltz-2 API, and optionally with a bound small-molecule ligand. Unlike
+RMSD's scope option below, Boltz-2 has no bulk mode — if you've built a
+multi-point selection (e.g. for RMSD), submitting to Boltz-2 ignores it and
+predicts only the single sequence you most recently clicked.
 
-1. Paste your NVIDIA API key and click **Check API key** to validate it —
-   the submit button stays disabled until validation succeeds (changing the
+**What leaves your machine.** This feature calls two external, third-party
+services over the network, so don't use it on sequences you need to keep
+private: your sequence (and, if you add one, the ligand SMILES) is sent to
+NVIDIA's hosted Boltz-2 API (`health.api.nvidia.com`) to run the prediction,
+and — unless you turn off **Use MSA** — is separately sent to the public
+ColabFold MSA server (`api.colabfold.com`) to build an alignment first.
+Nothing else in SSE sends sequence data anywhere.
+
+**Getting an API key.** You need an NVIDIA NGC personal API key (it starts
+with `nvapi-`):
+
+1. Sign in to (or create) an NVIDIA account at
+   [org.ngc.nvidia.com/account/api-keys](https://org.ngc.nvidia.com/account/api-keys)
+   and click **Generate Personal Key**.
+2. In the **Services Included** dropdown, make sure **NGC Catalog** is
+   selected (you can add other services too if you plan to reuse the same
+   key elsewhere).
+3. Generate the key and copy it immediately — NGC shows it to you only
+   once. Personal keys can be given an expiration date and revoked/rotated
+   later from the same page if you lose it or want to retire it.
+
+See NVIDIA's own [Boltz-2 getting-started
+guide](https://docs.nvidia.com/nim/bionemo/boltz2/latest/getting-started.html)
+for more background on the underlying service.
+
+**The key is not saved anywhere by SSE.** It lives only in the browser page
+for the current session — it isn't written to the datafile, to any file on
+disk, or persisted across a restart of the visualizer, so you'll need to
+paste it in again each time you relaunch the app.
+
+1. Paste your API key and click **Check API key** to validate it — the
+   submit button stays disabled until validation succeeds (changing the
    key text invalidates it again, so you always re-check after editing it).
 2. **Click a sequence point in the plot** to select the prediction target —
    the submit button also stays disabled until you've done this.
 3. Leave **Use MSA** on (recommended: an alignment-informed prediction is
-   more accurate) unless you have a specific reason to skip it.
+   more accurate) unless you have a specific reason to skip it — e.g. to
+   avoid sending the sequence to the ColabFold server, or for speed.
 4. Optionally paste one or more ligand SMILES strings (one per line) and a
    short label, to predict a **holo** (ligand-bound) structure instead of
    **apo**. Different ligands against the same sequence are cached and kept
@@ -241,7 +317,11 @@ datafile" needed. Predicted structures land in
 
 Structurally aligns predicted structures against a reference and reports
 RMSD (root-mean-square deviation), once you have at least one completed
-Boltz-2 apo prediction.
+Boltz-2 apo prediction. **RMSD only ever considers `apo` predictions** —
+a `holo` (ligand-bound) structure never appears as a reference or query
+option here, even if you've predicted one for the same sequence. If you
+need to compare a sequence structurally, predict (or also predict) it as
+apo.
 
 - **Reference structure**: which predicted sequence to align everything
   else against, and which ranked model of it (`Reference rank` — Boltz-2
