@@ -1,0 +1,613 @@
+{
+  "schema_version": 1,
+  "source_file": "my_hits_em.tsv",
+  "source_type": "em",
+  "creation_tool": "sse_initialization",
+  "creation_tool_version": "1.0.0",
+  "created_utc": "2026-07-13T16:02:14.470246+00:00",
+  "id_resolution": {
+    "id_col": "Accession",
+    "seq_col": "Sequence"
+  },
+  "row_counts": {
+    "kept": 50,
+    "dropped": 0,
+    "dropped_reason": "",
+    "queries": 1
+  },
+  "dropped_ids": [],
+  "columns": [
+    {
+      "name": "id",
+      "type": "id",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Sequence",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "query",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Annotation",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "First seen",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "41/50"
+    },
+    {
+      "name": "Closest query",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Identity closest query",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Kingdom",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Solubility",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Relative aggregation propensity",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Source databases",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Sequence length",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Optimum pH",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Melting temperature",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Domain annotation",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Extra domains",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "0/50"
+    },
+    {
+      "name": "Closest known",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Identity closest known",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Closest all",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Identity closest all",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Swiss-Prot",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "0/50"
+    },
+    {
+      "name": "Organism",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Salinity",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "0/50"
+    },
+    {
+      "name": "Optimum temp.",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Temp. range",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Biotic relationship",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Disease",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "0/50"
+    },
+    {
+      "name": "Transmembrane",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "ER template",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Catalytic His",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Catalytic Asp",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "PSPG 1",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "PSPG 2",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Essential residues",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "GI",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "Structure",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "0/50"
+    },
+    {
+      "name": "length",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "acidic_count",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "basic_count",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "acidic_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "basic_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "ED_RK_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "ED_IK_ratio",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "net_charge_pH7",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "MW",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "pI",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "aromaticity",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "instability_index",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "GRAVY",
+      "type": "label",
+      "provenance_source": "sse",
+      "tool": "sse_initialization",
+      "version": "1.0.0",
+      "params": "",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC1",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC2",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC3",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC4",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC5",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC6",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC7",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC8",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC9",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    },
+    {
+      "name": "esmc600m_mean_PC10",
+      "type": "coordinate",
+      "provenance_source": "sse",
+      "tool": "sse_coordinates",
+      "version": "1.0.0",
+      "params": "embedder=esmc;model=esmc_600m;pooling=mean;reducer=pca;n=10",
+      "notes": "",
+      "coverage": "50/50"
+    }
+  ],
+  "last_modified_utc": "2026-07-13T16:04:27.150740+00:00",
+  "last_tool": "sse_coordinates"
+}

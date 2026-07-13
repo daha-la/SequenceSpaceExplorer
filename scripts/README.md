@@ -56,36 +56,6 @@ The whole entry is built in a temporary directory first and only moved into
 `entries/<stem>/` once everything succeeded, so a failed or interrupted run
 never leaves a half-written entry behind.
 
-### What "query" means
-
-Every entry has a `query` column marking which rows are reference
-sequences rather than search/database hits. It's not just a label: a query
-row gets its own distinctive marker in the visualizer's plot (see the
-[visualizer guide](../docs/visualizer_guide.md#appearance)), and — per
-step 2 above — a query row can never be silently dropped for having an
-unusable sequence; creation aborts instead, on the theory that losing a
-reference sequence without telling you is worse than stopping.
-
-Which rows start out flagged `query` depends on the source, and can always
-be overridden with `--query`:
-
-- **`em`**: a row is auto-flagged as a query if its own id appears as a
-  *value* in some other row's `Closest query` column, i.e. another row
-  points to it as the closest known query. No `Closest query` column means
-  no auto-detection — every row starts unflagged unless you use `--query`.
-- **`fs`** (Foldseek): the reader looks for a hit with 100% sequence
-  identity to the search's own query sequence and flags that row. If no
-  such self-hit exists among the results, it adds one extra synthetic row
-  built from the search's own query record (so the query is always
-  represented, even if Foldseek didn't return it as a hit).
-- **`fasta`**: no auto-detection at all — nothing is flagged unless you
-  pass `--query`.
-
-`--query` always overrides whatever the reader would have auto-detected,
-matching the reader's raw identifying field as described in the flag table
-below (not the final resolved id) — see the `--query` row for exactly what
-that means per source.
-
 ### Usage
 
 ```bash
@@ -109,19 +79,60 @@ wrong silently would be worse than requiring one flag.
 
 ```bash
 # EnzymeMiner-style tabular export, default column names
-python scripts/sse_initialization.py my_enzymes.tsv --source em
+python scripts/sse_initialization.py my_hits_em.tsv --source em
 
 # Foldseek search result, entry named explicitly rather than after the file
-python scripts/sse_initialization.py search.json --source fs --name oleD_hits
+python scripts/sse_initialization.py my_hits_fs.json --source fs --name dummy_fs_hits
 
 # FASTA, marking one specific record as the query
-python scripts/sse_initialization.py seqs.fasta --source fasta \
-    --query 'sp|P12345|OLED_STRAN OleD'
+python scripts/sse_initialization.py my_hits_fasta.fasta --source fasta \
+    --query 'sp|D00005|DUMY5_TEST Dummy annotated protein 5 OS=Fakeomonas fictus'
 
 # Tabular source with non-default column names, rebuilding an existing entry
 python scripts/sse_initialization.py /path/to/data.tsv --source em \
     --id_col ProteinID --seq_col Seq --force
 ```
+
+### What "query" means
+
+Every entry has a `query` column marking which rows are reference
+sequences rather than search/database hits. It's not just a label: a query
+row gets its own distinctive marker in the visualizer's plot (see the
+[visualizer guide](../docs/visualizer_guide.md#appearance)), and — per
+step 2 of "What it does" above — a query row can never be silently dropped
+for having an unusable sequence; creation aborts instead, on the theory
+that losing a reference sequence without telling you is worse than
+stopping.
+
+Which rows start out flagged `query` depends on the source, and can always
+be overridden with `--query`:
+
+- **`em`**: a row is auto-flagged as a query if its own id appears as a
+  *value* in some other row's `Closest query` column, i.e. another row
+  points to it as the closest known query. No `Closest query` column means
+  no auto-detection — every row starts unflagged unless you use `--query`.
+- **`fs`** (Foldseek): the reader looks for a hit with 100% sequence
+  identity to the search's own query sequence and flags that row. If no
+  such self-hit exists among the results, it adds one extra synthetic row
+  built from the search's own query record (so the query is always
+  represented, even if Foldseek didn't return it as a hit).
+- **`fasta`**: no auto-detection at all — nothing is flagged unless you
+  pass `--query`.
+
+`--query` always overrides whatever the reader would have auto-detected,
+matching the reader's raw identifying field as described in the flag table
+above (not the final resolved id) — see the `--query` row for exactly what
+that means per source.
+
+**A query row is entirely optional.** Nothing downstream requires one:
+embedding, coordinates, filtering, and RMSD/Boltz-2 all work identically on
+an entry with zero query rows — you just get no special marker on the plot,
+and the "a query can't be dropped" rule above never has anything to apply
+to. This matters most for `fasta`, since it has no auto-detection at all
+(above) — a plain FASTA of sequences you're exploring, with no particular
+reference sequence in mind, is a completely normal entry as-is; there's no
+need to reach for `--query` unless you actually have one or more specific
+reference sequences you want highlighted.
 
 ## `sse_coordinates.py`
 
@@ -197,17 +208,17 @@ python scripts/sse_coordinates.py <entry> [options]
 
 ```bash
 # Default: ESM-C + PCA, 10 components
-python scripts/sse_coordinates.py akr
+python scripts/sse_coordinates.py my_hits_em
 
 # SaProt structure embedding, proceeding past rows with no usable structure
-python scripts/sse_coordinates.py oleD --embedder saprot --include_empty
+python scripts/sse_coordinates.py my_hits_fs --embedder saprot --include_empty
 
 # ESM-C 300M, max pooling, 20 PCs
-python scripts/sse_coordinates.py akr --embedder esmc --esmc-model esmc_300m \
+python scripts/sse_coordinates.py my_hits_em --embedder esmc --esmc-model esmc_300m \
     --pooling max --n-components 20
 
 # Replace an existing UMAP layout, reusing the cached ESM-C embeddings
-python scripts/sse_coordinates.py akr --embedder esmc --reducer umap --rereduce
+python scripts/sse_coordinates.py my_hits_em --embedder esmc --reducer umap --rereduce
 ```
 
 ## `fetch_taxonomy.py`
@@ -284,13 +295,13 @@ python scripts/fetch_taxonomy.py <entry> --email you@example.com [options]
 
 ```bash
 # Auto-detect the strategy
-python scripts/fetch_taxonomy.py my_hits --email you@dtu.dk
+python scripts/fetch_taxonomy.py my_hits_em --email you@dtu.dk
 
 # Force the foldseek strategy explicitly
-python scripts/fetch_taxonomy.py my_hits --email you@dtu.dk --strategy foldseek
+python scripts/fetch_taxonomy.py my_hits_fs --email you@dtu.dk --strategy foldseek
 
 # Re-attempt only the rows that failed transiently last time
-python scripts/fetch_taxonomy.py my_hits --email you@dtu.dk --retry-failed
+python scripts/fetch_taxonomy.py my_hits_em --email you@dtu.dk --retry-failed
 ```
 
 ## `merge_external.py`
@@ -344,15 +355,15 @@ python scripts/merge_external.py <entry> <external_file> [options]
 
 ```bash
 # Merge every column from a CSV, matched directly by id
-python scripts/merge_external.py my_hits dummy_biophysical.csv
+python scripts/merge_external.py my_hits_em dummy_biophysical.csv
 
 # Merge specific columns, remapping lab clone codes onto datafile ids first
-python scripts/merge_external.py my_hits dummy_lab_codes.tsv \
+python scripts/merge_external.py my_hits_em dummy_lab_codes.tsv \
     --id-col clone_id --columns activity_units,notes \
     --translator id_translator.tsv
 
 # Re-merge after correcting the source file
-python scripts/merge_external.py my_hits dummy_biophysical.csv --force
+python scripts/merge_external.py my_hits_em dummy_biophysical.csv --force
 ```
 
 ## `sse_visualizer.py`
@@ -391,9 +402,9 @@ than erroring out.
 
 ```bash
 # Default port
-python scripts/sse_visualizer.py my_hits
+python scripts/sse_visualizer.py my_hits_em
 
 # Running two entries side by side
-python scripts/sse_visualizer.py my_hits --port 8051
-python scripts/sse_visualizer.py other_hits --port 8052
+python scripts/sse_visualizer.py my_hits_em --port 8051
+python scripts/sse_visualizer.py my_hits_fs --port 8052
 ```

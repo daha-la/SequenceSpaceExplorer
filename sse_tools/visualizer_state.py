@@ -333,7 +333,12 @@ def detect_name_cols(df: pd.DataFrame, id_col: str, label_cols: Iterable[str]) -
         if c == id_col:
             continue
         if any(kw in c.lower() for kw in NAME_KEYWORDS):
-            if df[c].dtype == object and df[c].nunique(dropna=True) <= MAX_CAT_UNIQUE:
+            # Accept object (older pandas) and StringDtype (pandas >= 3.0, which
+            # is what read_datafile's dtype=str now yields) — both are text
+            # columns. A bare `== object` check silently matched nothing under
+            # pandas 3.0, disabling name-column search entirely.
+            is_text = df[c].dtype == object or pd.api.types.is_string_dtype(df[c].dtype)
+            if is_text and df[c].nunique(dropna=True) <= MAX_CAT_UNIQUE:
                 out.append(c)
     return out
 

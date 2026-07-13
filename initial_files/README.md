@@ -32,12 +32,13 @@ Each source also auto-detects which row(s) get flagged as the entry's
 `query` (reference) sequences differently — see ["What 'query'
 means"](../scripts/README.md#what-query-means) in `scripts/README.md`.
 
-Both example files currently in this folder are real inputs for the two
-`entries/` examples in this repo, and are a good reference for the expected
-shape of each format:
+This folder also has a dummy example for each `--source`, built from synthetic
+sequences (no real data), as a reference for the expected shape of each
+format:
 
-- `EnzymeMiner_Selection_Table_ri4plk.tsv` — `em`
-- `Foldseek_2026_05_21_13_42_55.json` — `fs`
+- `my_hits_em.tsv` — `em`
+- `my_hits_fasta.fasta` — `fasta`
+- `my_hits_fs.json` — `fs`
 
 To support a source format not listed here, see the plug-in pattern for
 `readers/` in [`sse_tools/README.md`](../sse_tools/README.md).

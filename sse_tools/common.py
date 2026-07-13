@@ -333,8 +333,9 @@ def merge_columns(datafile_path, new_df, new_types, *, manifest_path=None,
 
         new_names = [c for c in new_df.columns if c != id_col]
         reserved_hit = [c for c in new_names if c in (COL_ID, COL_SEQ, COL_QUERY)]
-        if reserved_hit:
-            abort(f"refusing to overwrite reserved column(s): {reserved_hit}.")
+        if reserved_hit and not force:
+            abort(f"refusing to overwrite reserved column(s): {reserved_hit}. "
+                  f"Use --force to overwrite.")
 
         drop_set = set(drop_columns or [])
         reserved_drop = [c for c in drop_set if c in (COL_ID, COL_SEQ, COL_QUERY)]

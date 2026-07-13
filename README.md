@@ -142,18 +142,18 @@ path directly — bare filenames are looked up there).
 **2. Create the entry.** This is a one-time, bootstrap-only step per source file:
 
 ```bash
-python scripts/sse_initialization.py my_hits.tsv --source em
+python scripts/sse_initialization.py my_hits_em.tsv --source em
 ```
 
 `--source` selects the reader: `em` (EnzymeMiner-style tabular export), `fs`
-(Foldseek JSON), or `fasta`. This creates `entries/my_hits/` containing
-`my_hits.sse.tsv` plus a provenance manifest and empty subfolders
+(Foldseek JSON), or `fasta`. This creates `entries/my_hits_em/` containing
+`my_hits_em.sse.tsv` plus a provenance manifest and empty subfolders
 (`external_data/`, `structures/`, `figures/`, `msa_cache/`, `logs/`).
 
 **3. Compute coordinates.** Embeds every sequence and reduces it to 2D:
 
 ```bash
-python scripts/sse_coordinates.py my_hits --embedder esmc --reducer pca
+python scripts/sse_coordinates.py my_hits_em --embedder esmc --reducer pca
 ```
 
 This adds `coordinate`-typed columns (e.g. `esmc600m_mean_PC1/PC2`) to the
@@ -164,7 +164,7 @@ between them.
 **4. Launch the visualizer:**
 
 ```bash
-python scripts/sse_visualizer.py my_hits
+python scripts/sse_visualizer.py my_hits_em
 ```
 
 Open the printed `http://127.0.0.1:8051` URL. From there you can filter by any
@@ -178,13 +178,13 @@ after step 3:
 
 ```bash
 # Pull NCBI taxonomy lineages onto every row
-python scripts/fetch_taxonomy.py my_hits --email you@example.com
+python scripts/fetch_taxonomy.py my_hits_em --email you@example.com
 
 # Merge in your own external data (e.g. experimental measurements)
-python scripts/merge_external.py my_hits my_measurements.csv
+python scripts/merge_external.py my_hits_em my_measurements.csv
 ```
 
-Every script accepts an entry **stem** (`my_hits`), an entry **directory**, or
+Every script accepts an entry **stem** (`my_hits_em`), an entry **directory**, or
 a direct path to the `.sse.tsv` file. Run any script with `--help` for its
 full flag reference.
 

@@ -28,6 +28,9 @@ dependencies:
   - scikit-learn
   - matplotlib
 
+  # --- dev / testing: run `python -m pytest tests/` from the repo root -------
+  - pytest
+
   # --- everything below is installed via pip inside the conda env -----------
   - pip:
       - dash
