@@ -75,12 +75,3 @@ Everything else:
 | `boltz_log.csv` | One row per Boltz-2 prediction run (status, pTM, pLDDT, cif paths, ...). |
 | `rmsd_log.csv` | One row per RMSD comparison run. |
 | `<tag>_<reducer>.log` | Text log from a `sse_coordinates.py` run for that coordinate system. |
-
-## What's safe to delete
-
-Only `<stem>.sse.tsv` (and, if you care about provenance history,
-`logs/<stem>.sse.manifest.json`) holds data you can't regenerate. Everything
-else — `embeddings/`, `structures/`, `msa_cache/`, `figures/`, and the rest
-of `logs/` — exists purely to cache or record work already reflected in the
-datafile's columns; deleting any of it just means the next run recomputes
-or re-fetches instead of reusing a cache.
