@@ -24,7 +24,7 @@ just need the packages listed in [`env/requirement.yaml`](env/requirement.yaml).
 If you have `git` installed:
 
 ```bash
-git clone https://github.com/<your-org-or-user>/SequenceSpaceExplorer.git
+git clone https://github.com/daha-la/SequenceSpaceExplorer.git
 cd SequenceSpaceExplorer
 ```
 
