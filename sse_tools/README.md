@@ -21,7 +21,7 @@ registries rather than branching logic, so adding support for something new
 never means editing an existing script:
 
 ```
-readers/     source format  -> a flat table          (em, fasta, fs)
+readers/     source format  -> a flat table           (em, fasta, fs)
 embedders/   sequence/struct -> an embedding vector   (esmc, prostt5, saprot)
 reducers/    embedding matrix -> 2D/nD coordinates    (pca, umap, tsne)
 taxonomy/    datafile row -> an NCBI taxId            (em, foldseek)
