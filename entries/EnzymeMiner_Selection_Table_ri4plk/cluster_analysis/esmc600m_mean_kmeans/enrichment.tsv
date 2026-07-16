@@ -1,0 +1,334 @@
+cluster	feature	test	category	direction	in_cluster	background	effect_size	n_in_cluster	p_value	q_value
+0	Sequence length	mann-whitney		lower	388.0	401.0	-0.831	1298	0.00e+00	0.00e+00
+1	class	fisher	Bacilli	enriched	0.99	0.134	669.911	1969	0.00e+00	0.00e+00
+0	class	fisher	Actinomycetes	enriched	0.999	0.507	1251.621	1288	0.00e+00	0.00e+00
+3	net_charge_pH7	mann-whitney		lower	-22.454	-9.661	-0.836	2196	0.00e+00	0.00e+00
+1	Melting temperature	mann-whitney		lower	45.51	50.61	-0.75	1993	0.00e+00	0.00e+00
+7	phylum	fisher	Pseudomonadota	enriched	0.819	0.004	1090.199	217	0.00e+00	0.00e+00
+1	Relative aggregation propensity	mann-whitney		higher	1.33	0.686	0.894	1993	0.00e+00	0.00e+00
+3	ED_RK_ratio	mann-whitney		higher	1.676	1.256	0.813	2196	0.00e+00	0.00e+00
+0	MW	mann-whitney		lower	39934.987	44221.704	-0.972	1298	0.00e+00	0.00e+00
+1	MW	mann-whitney		higher	45282.123	43472.186	0.646	1993	0.00e+00	0.00e+00
+3	phylum	fisher	Actinomycetota	enriched	0.995	0.444	248.456	2184	0.00e+00	0.00e+00
+1	phylum	fisher	Bacillota	enriched	0.997	0.152	2213.627	1986	0.00e+00	0.00e+00
+0	phylum	fisher	Actinomycetota	enriched	1.0	0.501	inf	1297	0.00e+00	0.00e+00
+3	Identity closest known	mann-whitney		higher	74.4	38.0	0.872	2196	0.00e+00	0.00e+00
+3	pI	mann-whitney		lower	4.877	5.445	-0.747	2196	0.00e+00	0.00e+00
+0	GRAVY	mann-whitney		higher	0.163	-0.123	0.944	1298	0.00e+00	0.00e+00
+0	aromaticity	mann-whitney		lower	0.031	0.075	-1.0	1298	0.00e+00	0.00e+00
+1	aromaticity	mann-whitney		higher	0.1	0.07	0.889	1993	0.00e+00	0.00e+00
+3	acidic_ratio	mann-whitney		higher	0.141	0.119	0.712	2196	0.00e+00	0.00e+00
+3	class	fisher	Actinomycetes	enriched	0.995	0.449	243.376	2184	0.00e+00	0.00e+00
+3	Relative aggregation propensity	mann-whitney		lower	0.456	0.922	-0.701	2196	0.00e+00	0.00e+00
+3	acidic_count	mann-whitney		higher	57.0	48.0	0.737	2196	0.00e+00	0.00e+00
+0	length	mann-whitney		lower	388.0	401.0	-0.831	1298	0.00e+00	0.00e+00
+3	basic_ratio	mann-whitney		lower	0.085	0.094	-0.538	2196	0.00e+00	0.00e+00
+9	ED_IK_ratio	mann-whitney		higher	3.059	2.071	0.685	1241	0.00e+00	0.00e+00
+1	ED_IK_ratio	mann-whitney		lower	0.825	2.5	-0.939	1993	0.00e+00	0.00e+00
+0	acidic_count	mann-whitney		lower	41.0	53.0	-0.694	1298	0.00e+00	0.00e+00
+3	Identity closest query	mann-whitney		higher	74.4	38.0	0.872	2196	0.00e+00	0.00e+00
+2	Identity closest query	mann-whitney		lower	26.3	42.3	-0.884	168	2.91e-86	1.00e-85
+9	acidic_ratio	mann-whitney		higher	0.136	0.126	0.345	1241	2.89e-86	1.00e-85
+2	Identity closest known	mann-whitney		lower	26.3	42.3	-0.884	168	2.91e-86	1.00e-85
+4	pI	mann-whitney		higher	7.779	5.227	0.649	472	2.18e-125	1.03e-124
+11	class	fisher	Myxococcia	enriched	0.483	0.006	143.884	56	3.06e-81	1.03e-80
+8	Disease	fisher	NO	enriched	0.137	0.0	inf	7	7.16e-07	1.05e-06
+3	MW	mann-whitney		lower	43465.565	44161.454	-0.117	2196	5.85e-17	1.05e-16
+7	ED_IK_ratio	mann-whitney		lower	1.952	2.292	-0.095	267	8.30e-03	1.06e-02
+8	Biotic relationship	fisher	Free living	enriched	0.969	0.774	9.221	95	7.27e-07	1.06e-06
+0	pI	mann-whitney		higher	5.78	5.165	0.481	1298	1.61e-172	1.06e-171
+8	Identity closest all	mann-whitney		higher	99.7	98.8	0.469	467	3.68e-66	1.06e-65
+8	Sequence length	mann-whitney		lower	395.0	400.0	-0.213	467	6.08e-15	1.07e-14
+8	length	mann-whitney		lower	395.0	400.0	-0.213	467	6.08e-15	1.07e-14
+6	Melting temperature	mann-whitney		lower	46.77	49.78	-0.386	797	3.40e-73	1.07e-72
+6	Identity closest query	mann-whitney		lower	32.9	51.4	-0.427	797	2.97e-89	1.07e-88
+6	Identity closest known	mann-whitney		lower	32.9	51.4	-0.427	797	2.97e-89	1.07e-88
+2	basic_count	mann-whitney		lower	35.0	36.0	-0.242	168	7.10e-08	1.08e-07
+9	acidic_count	mann-whitney		higher	54.0	50.0	0.317	1241	3.46e-73	1.08e-72
+10	aromaticity	mann-whitney		higher	0.079	0.072	0.119	165	8.56e-03	1.09e-02
+11	GRAVY	mann-whitney		higher	0.004	-0.102	0.373	137	6.32e-14	1.09e-13
+1	basic_count	mann-whitney		higher	40.0	36.0	0.387	1993	1.83e-158	1.09e-157
+6	net_charge_pH7	mann-whitney		higher	-11.352	-13.297	0.115	797	7.27e-08	1.10e-07
+7	acidic_ratio	mann-whitney		lower	0.09	0.13	-0.863	267	2.26e-128	1.11e-127
+7	Identity closest all	mann-whitney		lower	97.2	99.0	-0.268	267	6.45e-14	1.11e-13
+8	pI	mann-whitney		lower	4.942	5.289	-0.455	467	3.99e-62	1.12e-61
+10	ED_IK_ratio	mann-whitney		lower	0.776	2.292	-0.791	165	3.88e-68	1.12e-67
+5	phylum	fisher	Actinomycetota	enriched	0.925	0.536	10.663	713	2.55e-117	1.13e-116
+4	ED_IK_ratio	mann-whitney		lower	1.362	2.32	-0.287	472	5.77e-26	1.13e-25
+4	class	fisher	Caldilineae	enriched	0.02	0.0	inf	8	6.85e-12	1.14e-11
+7	phylum	fisher	Acidobacteriota	enriched	0.042	0.018	2.424	11	9.04e-03	1.15e-02
+5	net_charge_pH7	mann-whitney		higher	0.416	-13.661	0.547	773	2.17e-141	1.15e-140
+4	phylum	fisher	Planctomycetota	enriched	0.113	0.003	46.336	53	4.55e-52	1.16e-51
+2	Identity closest all	mann-whitney		lower	91.15	99.0	-0.482	168	5.91e-27	1.17e-26
+2	class	fisher	Chloroflexia	enriched	0.031	0.001	44.097	5	8.13e-07	1.18e-06
+5	ED_RK_ratio	mann-whitney		lower	1.0	1.386	-0.521	773	2.46e-128	1.20e-127
+4	phylum	fisher	Chloroflexota	enriched	0.196	0.01	24.907	92	3.82e-74	1.21e-73
+1	acidic_ratio	mann-whitney		higher	0.131	0.128	0.057	1993	9.00e-05	1.24e-04
+10	Identity closest all	mann-whitney		lower	95.9	99.0	-0.261	165	7.89e-09	1.24e-08
+1	Optimum pH	mann-whitney		lower	7.489	7.502	0.094	1993	7.61e-11	1.25e-10
+6	phylum	fisher	Bacillota	enriched	0.879	0.273	19.265	695	1.12e-255	1.25e-254
+7	instability_index	mann-whitney		higher	45.442	40.772	0.435	267	5.85e-34	1.25e-33
+11	phylum	fisher	Myxococcota	enriched	0.439	0.007	115.822	58	3.83e-80	1.26e-79
+6	phylum	fisher	Bacteroidota	enriched	0.014	0.0	inf	11	7.51e-13	1.27e-12
+4	Identity closest known	mann-whitney		lower	27.2	47.6	-0.812	472	1.57e-195	1.27e-194
+4	Identity closest query	mann-whitney		lower	27.2	47.6	-0.812	472	1.57e-195	1.27e-194
+6	aromaticity	mann-whitney		higher	0.097	0.071	0.651	797	1.49e-204	1.27e-203
+11	Identity closest all	mann-whitney		lower	94.3	99.0	-0.194	137	9.39e-05	1.29e-04
+11	aromaticity	mann-whitney		lower	0.059	0.072	-0.428	137	7.09e-18	1.29e-17
+9	phylum	fisher	Actinomycetota	enriched	0.984	0.506	59.582	1221	9.58e-294	1.29e-292
+11	phylum	fisher	Planctomycetota	enriched	0.061	0.007	8.858	8	9.17e-06	1.30e-05
+10	ED_RK_ratio	mann-whitney		lower	0.971	1.368	-0.728	165	4.79e-58	1.30e-57
+5	Optimum pH	mann-whitney		lower	7.474	7.502	-0.106	773	9.21e-07	1.33e-06
+2	GRAVY	mann-whitney		higher	0.116	-0.104	0.695	168	5.10e-54	1.33e-53
+4	basic_count	mann-whitney		higher	41.0	36.0	0.404	472	5.39e-50	1.34e-49
+10	instability_index	mann-whitney		lower	39.439	40.915	-0.116	165	1.08e-02	1.36e-02
+2	acidic_ratio	mann-whitney		lower	0.111	0.129	-0.336	168	7.93e-14	1.36e-13
+8	MW	mann-whitney		higher	44353.196	43799.137	0.25	467	7.60e-20	1.40e-19
+4	instability_index	mann-whitney		higher	42.033	40.845	0.106	472	1.04e-04	1.42e-04
+0	Relative aggregation propensity	mann-whitney		lower	0.75	0.799	-0.056	1298	1.08e-03	1.43e-03
+4	net_charge_pH7	mann-whitney		higher	1.289	-13.595	0.651	472	2.99e-126	1.44e-125
+8	Salinity	fisher	Moderate halophilic, Non-halophilic	enriched	0.168	0.006	34.742	17	9.21e-12	1.52e-11
+6	ED_IK_ratio	mann-whitney		lower	1.091	2.368	-0.54	797	2.91e-141	1.52e-140
+1	Disease	fisher	insecticide	enriched	0.556	0.0	inf	119	7.05e-37	1.52e-36
+7	phylum	fisher	Planctomycetota	enriched	0.03	0.007	4.215	8	1.16e-03	1.53e-03
+6	MW	mann-whitney		higher	44865.514	43765.724	0.339	797	5.71e-57	1.53e-56
+2	phylum	fisher	Chloroflexota	enriched	0.048	0.018	2.747	8	1.23e-02	1.55e-02
+8	Identity closest query	mann-whitney		lower	30.9	47.5	-0.575	467	4.04e-98	1.55e-97
+8	Identity closest known	mann-whitney		lower	30.9	47.5	-0.575	467	4.04e-98	1.55e-97
+8	ED_RK_ratio	mann-whitney		higher	1.452	1.342	0.212	467	9.14e-15	1.60e-14
+1	pI	mann-whitney		higher	5.35	5.172	0.135	1993	8.60e-21	1.60e-20
+4	class	fisher	Coriobacteriia	enriched	0.013	0.0	inf	5	1.07e-07	1.61e-07
+10	class	fisher	Gammaproteobacteria	enriched	0.042	0.013	3.293	6	1.30e-02	1.64e-02
+0	basic_count	mann-whitney		lower	36.0	37.0	-0.156	1298	8.98e-20	1.64e-19
+1	Disease	fisher	Sotto disease	enriched	0.037	0.0	inf	8	1.32e-02	1.65e-02
+8	Salinity	fisher	Mesophilic	enriched	0.238	0.141	1.9	24	1.33e-02	1.66e-02
+11	phylum	fisher	Acidobacteriota	enriched	0.106	0.017	6.857	14	1.11e-07	1.66e-07
+9	Relative aggregation propensity	mann-whitney		lower	0.523	0.878	-0.497	1241	2.52e-177	1.69e-176
+8	basic_count	mann-whitney		higher	42.0	36.0	0.565	467	4.57e-95	1.69e-94
+10	class	fisher	Cyanophyceae	enriched	0.944	0.002	8565.316	136	1.43e-273	1.70e-272
+11	ED_RK_ratio	mann-whitney		lower	0.87	1.366	-0.818	137	6.10e-61	1.71e-60
+4	Optimum pH	mann-whitney		higher	7.639	7.494	0.478	472	5.86e-69	1.71e-68
+7	acidic_count	mann-whitney		lower	38.0	52.0	-0.794	267	4.30e-109	1.75e-108
+7	Melting temperature	mann-whitney		higher	50.32	49.34	0.255	267	1.04e-12	1.75e-12
+0	Identity closest all	mann-whitney		lower	98.4	99.0	-0.098	1298	1.12e-08	1.76e-08
+4	class	fisher	Ktedonobacteria	enriched	0.041	0.004	10.912	16	1.08e-10	1.77e-10
+4	GRAVY	mann-whitney		higher	-0.027	-0.106	0.297	472	8.94e-28	1.82e-27
+11	Melting temperature	mann-whitney		higher	59.89	49.36	0.543	137	8.97e-28	1.82e-27
+5	length	mann-whitney		higher	406.0	400.0	0.278	773	8.25e-38	1.82e-37
+5	Sequence length	mann-whitney		higher	406.0	400.0	0.278	773	8.25e-38	1.82e-37
+6	length	mann-whitney		higher	401.0	400.0	0.103	797	1.28e-06	1.84e-06
+6	Sequence length	mann-whitney		higher	401.0	400.0	0.103	797	1.28e-06	1.84e-06
+7	class	fisher	Betaproteobacteria	enriched	0.079	0.0	203.412	20	9.01e-29	1.84e-28
+0	Salinity	fisher	Mesophilic	enriched	0.829	0.063	72.55	63	7.67e-48	1.84e-47
+9	class	fisher	Actinomycetes	enriched	0.984	0.512	58.146	1221	1.42e-287	1.85e-286
+11	MW	mann-whitney		higher	46768.522	43874.799	0.602	137	8.73e-34	1.85e-33
+6	GRAVY	mann-whitney		higher	-0.065	-0.107	0.13	797	1.16e-09	1.88e-09
+8	Relative aggregation propensity	mann-whitney		higher	1.008	0.741	0.299	467	9.42e-28	1.90e-27
+9	basic_count	mann-whitney		lower	34.0	37.0	-0.393	1241	4.55e-112	1.93e-111
+6	Identity closest all	mann-whitney		lower	97.5	99.0	-0.254	797	9.19e-33	1.94e-32
+2	ED_RK_ratio	mann-whitney		lower	1.257	1.361	-0.171	168	1.45e-04	1.97e-04
+6	basic_count	mann-whitney		lower	35.0	37.0	-0.112	797	1.33e-07	1.99e-07
+4	class	fisher	Planctomycetia	enriched	0.094	0.002	45.869	37	9.29e-38	2.03e-37
+1	acidic_count	mann-whitney		higher	52.0	51.0	0.063	1993	1.45e-05	2.04e-05
+11	basic_ratio	mann-whitney		higher	0.111	0.091	0.706	137	8.66e-46	2.04e-45
+0	Disease	fisher	Wound, cornea, and skin infections	enriched	0.032	0.0	inf	3	1.67e-02	2.07e-02
+0	Disease	fisher	Hospital Infection	enriched	0.032	0.0	inf	3	1.67e-02	2.07e-02
+10	acidic_count	mann-whitney		lower	36.0	52.0	-0.879	165	6.15e-84	2.10e-83
+5	class	fisher	Clostridia	enriched	0.027	0.015	1.775	20	1.71e-02	2.11e-02
+7	class	fisher	Alphaproteobacteria	enriched	0.304	0.002	207.003	77	5.25e-108	2.12e-107
+4	Identity closest all	mann-whitney		lower	79.15	99.0	-0.641	472	4.57e-123	2.12e-122
+9	instability_index	mann-whitney		higher	42.201	40.647	0.184	1241	1.09e-25	2.13e-25
+2	acidic_count	mann-whitney		lower	43.5	52.0	-0.418	168	1.17e-20	2.18e-20
+7	phylum	fisher	Cyanobacteriota	enriched	0.087	0.017	5.352	23	1.36e-09	2.19e-09
+1	Biotic relationship	fisher	Free living	enriched	0.971	0.715	13.527	170	1.30e-13	2.21e-13
+7	class	fisher	Vicinamibacteria	enriched	0.012	0.0	56.886	3	1.67e-04	2.26e-04
+7	Relative aggregation propensity	mann-whitney		lower	0.675	0.802	-0.217	267	1.41e-09	2.26e-09
+10	acidic_ratio	mann-whitney		lower	0.086	0.13	-0.922	165	6.16e-92	2.26e-91
+3	Melting temperature	mann-whitney		higher	51.755	47.93	0.485	2196	1.98e-264	2.28e-263
+1	net_charge_pH7	mann-whitney		higher	-10.689	-15.209	0.158	1993	1.14e-27	2.29e-27
+2	class	fisher	Acidimicrobiia	enriched	0.037	0.0	124.325	6	1.45e-09	2.31e-09
+1	basic_ratio	mann-whitney		higher	0.1	0.09	0.421	1993	3.33e-186	2.31e-185
+9	Identity closest known	mann-whitney		higher	69.6	39.2	0.552	1241	2.58e-218	2.31e-217
+9	Identity closest query	mann-whitney		higher	69.6	39.2	0.552	1241	2.58e-218	2.31e-217
+0	Disease	fisher	Tuberculosis, caseous pneumonia, tuberculosis, infiltrative tuberculosis, Extra Pulmonary Tuberculosis	enriched	0.628	0.0	inf	59	1.00e-43	2.31e-43
+10	Melting temperature	mann-whitney		lower	46.8	49.48	-0.375	165	1.30e-16	2.33e-16
+8	aromaticity	mann-whitney		higher	0.094	0.072	0.483	467	7.90e-70	2.33e-69
+4	class	fisher	Terriglobia	enriched	0.324	0.002	248.303	128	3.83e-166	2.34e-165
+5	acidic_count	mann-whitney		lower	39.0	52.0	-0.575	773	4.03e-156	2.35e-155
+2	class	fisher	Actinomycetes	enriched	0.863	0.567	4.781	138	1.33e-15	2.36e-15
+6	pI	mann-whitney		higher	5.389	5.243	0.092	797	1.71e-05	2.40e-05
+6	class	fisher	Chitinophagia	enriched	0.009	0.0	inf	7	1.54e-08	2.40e-08
+5	basic_ratio	mann-whitney		higher	0.098	0.091	0.226	773	1.24e-25	2.40e-25
+7	aromaticity	mann-whitney		lower	0.057	0.073	-0.642	267	8.01e-72	2.41e-71
+10	Relative aggregation propensity	mann-whitney		higher	0.98	0.764	0.17	165	1.80e-04	2.43e-04
+4	basic_ratio	mann-whitney		higher	0.099	0.091	0.297	472	1.23e-27	2.45e-27
+10	MW	mann-whitney		higher	46407.762	43858.404	0.812	165	8.20e-72	2.45e-71
+7	Identity closest known	mann-whitney		lower	26.0	45.3	-0.912	267	4.52e-143	2.46e-142
+7	Identity closest query	mann-whitney		lower	26.0	45.3	-0.912	267	4.52e-143	2.46e-142
+4	class	fisher	Nitrospiria	enriched	0.068	0.0	inf	27	1.10e-38	2.48e-38
+1	Identity closest known	mann-whitney		lower	37.8	56.1	-0.307	1993	6.31e-100	2.49e-99
+1	Identity closest query	mann-whitney		lower	37.8	56.1	-0.307	1993	6.31e-100	2.49e-99
+10	Salinity	fisher	Moderate halophilic	enriched	0.667	0.209	7.578	4	2.08e-02	2.57e-02
+7	class	fisher	Gammaproteobacteria	enriched	0.47	0.001	700.901	119	3.47e-187	2.59e-186
+4	ED_RK_ratio	mann-whitney		lower	0.976	1.382	-0.631	472	5.81e-119	2.60e-118
+7	class	fisher	Cyanophyceae	enriched	0.051	0.015	3.563	13	1.94e-04	2.62e-04
+5	Identity closest known	mann-whitney		lower	30.9	51.3	-0.631	773	3.65e-187	2.63e-186
+5	Identity closest query	mann-whitney		lower	30.9	51.3	-0.631	773	3.65e-187	2.63e-186
+6	Temp. range	fisher	Thermophilic	enriched	0.057	0.0	inf	3	2.00e-04	2.69e-04
+9	pI	mann-whitney		lower	4.929	5.338	-0.514	1241	3.55e-189	2.70e-188
+6	class	fisher	Clostridia	enriched	0.14	0.006	27.529	105	8.30e-80	2.70e-79
+8	basic_ratio	mann-whitney		higher	0.107	0.091	0.629	467	6.22e-117	2.72e-116
+5	pI	mann-whitney		higher	7.181	5.219	0.585	773	4.66e-161	2.80e-160
+5	ED_IK_ratio	mann-whitney		higher	3.3	2.158	0.691	773	2.86e-224	2.81e-223
+6	class	fisher	Bacilli	enriched	0.754	0.272	8.212	564	5.03e-151	2.84e-150
+8	Melting temperature	mann-whitney		lower	44.53	49.7	-0.716	467	5.08e-151	2.84e-150
+2	MW	mann-whitney		lower	40856.664	43929.028	-0.644	168	1.21e-46	2.89e-46
+4	MW	mann-whitney		higher	45744.155	43825.887	0.518	472	8.72e-81	2.90e-80
+11	Relative aggregation propensity	mann-whitney		lower	0.727	0.775	-0.152	137	2.21e-03	2.92e-03
+2	Melting temperature	mann-whitney		higher	53.765	49.32	0.576	168	1.35e-37	2.94e-37
+11	class	fisher	Chlorobiia	enriched	0.034	0.0	inf	4	1.91e-08	2.98e-08
+2	phylum	fisher	Actinomycetota	enriched	0.892	0.56	6.501	149	1.62e-20	2.99e-20
+7	basic_count	mann-whitney		higher	44.0	36.0	0.706	267	8.54e-87	3.02e-86
+11	length	mann-whitney		higher	432.0	400.0	0.695	137	1.31e-44	3.06e-44
+11	Sequence length	mann-whitney		higher	432.0	400.0	0.695	137	1.31e-44	3.06e-44
+6	class	fisher	Anaerolineae	enriched	0.012	0.005	2.317	9	2.58e-02	3.17e-02
+3	Identity closest all	mann-whitney		higher	99.0	98.8	0.098	2196	1.94e-12	3.24e-12
+7	Sequence length	mann-whitney		higher	425.0	400.0	0.822	267	7.59e-117	3.26e-116
+7	length	mann-whitney		higher	425.0	400.0	0.822	267	7.59e-117	3.26e-116
+8	net_charge_pH7	mann-whitney		lower	-18.839	-12.032	-0.401	467	1.35e-48	3.26e-48
+6	phylum	fisher	Chloroflexota	enriched	0.082	0.013	6.802	65	1.67e-26	3.29e-26
+5	Relative aggregation propensity	mann-whitney		lower	0.664	0.838	-0.327	773	1.30e-51	3.30e-51
+4	phylum	fisher	Acidobacteriota	enriched	0.311	0.004	122.005	146	5.34e-168	3.31e-167
+1	Identity closest all	mann-whitney		higher	99.5	98.7	0.288	1993	9.40e-89	3.35e-88
+5	acidic_ratio	mann-whitney		lower	0.096	0.131	-0.571	773	5.95e-154	3.42e-153
+7	pI	mann-whitney		higher	9.185	5.237	0.889	267	6.74e-136	3.44e-135
+7	net_charge_pH7	mann-whitney		higher	6.532	-13.384	0.908	267	6.53e-142	3.51e-141
+6	ED_RK_ratio	mann-whitney		lower	1.333	1.364	-0.064	797	2.71e-03	3.55e-03
+4	acidic_ratio	mann-whitney		lower	0.1	0.13	-0.647	472	7.61e-125	3.57e-124
+7	GRAVY	mann-whitney		higher	0.062	-0.106	0.641	267	1.22e-71	3.61e-71
+7	basic_ratio	mann-whitney		higher	0.105	0.091	0.563	267	1.38e-55	3.66e-55
+0	acidic_ratio	mann-whitney		lower	0.106	0.132	-0.617	1298	2.94e-282	3.70e-281
+11	Optimum pH	mann-whitney		higher	7.569	7.5	0.256	137	2.51e-07	3.73e-07
+2	ED_IK_ratio	mann-whitney		higher	3.477	2.245	0.679	168	1.49e-51	3.74e-51
+1	Salinity	fisher	Moderate halophilic	enriched	0.272	0.102	3.282	110	2.53e-07	3.75e-07
+0	Biotic relationship	fisher	Parasite	enriched	0.033	0.003	11.528	3	3.12e-02	3.82e-02
+6	acidic_count	mann-whitney		lower	47.0	52.0	-0.222	797	1.98e-25	3.82e-25
+3	GRAVY	mann-whitney		lower	-0.162	-0.075	-0.418	2196	4.56e-197	3.83e-196
+0	Melting temperature	mann-whitney		lower	47.62	49.98	-0.277	1298	1.45e-58	3.94e-58
+7	ED_RK_ratio	mann-whitney		lower	0.867	1.372	-0.902	267	7.66e-140	3.96e-139
+10	phylum	fisher	Cyanobacteriota	enriched	0.952	0.004	5467.525	157	2.85e-298	3.97e-297
+0	ED_RK_ratio	mann-whitney		lower	1.164	1.422	-0.501	1298	5.80e-187	4.10e-186
+2	basic_ratio	mann-whitney		lower	0.09	0.091	-0.095	168	3.40e-02	4.15e-02
+0	Identity closest query	mann-whitney		higher	57.8	39.2	0.31	1298	1.35e-72	4.16e-72
+0	Identity closest known	mann-whitney		higher	57.8	39.2	0.31	1298	1.35e-72	4.16e-72
+1	instability_index	mann-whitney		lower	38.549	41.586	-0.306	1993	1.07e-99	4.19e-99
+2	Optimum pH	mann-whitney		higher	7.543	7.501	0.095	168	3.54e-02	4.31e-02
+1	Temp. range	fisher	Mesophilic	enriched	0.992	0.883	16.577	501	2.56e-13	4.35e-13
+7	class	fisher	Terriglobia	enriched	0.032	0.015	2.211	8	3.65e-02	4.43e-02
+4	acidic_count	mann-whitney		lower	41.0	52.0	-0.565	472	1.19e-95	4.43e-95
+11	pI	mann-whitney		higher	9.63	5.251	0.843	137	1.56e-64	4.45e-64
+6	phylum	fisher	Thermodesulfobacteriota	enriched	0.006	0.0	inf	5	3.14e-06	4.48e-06
+9	Melting temperature	mann-whitney		higher	52.66	48.65	0.487	1241	7.04e-170	4.50e-169
+11	instability_index	mann-whitney		higher	45.946	40.831	0.434	137	2.47e-18	4.50e-18
+0	Optimum pH	mann-whitney		lower	7.384	7.517	-0.421	1298	9.02e-133	4.54e-132
+6	Transmembrane	fisher	o402-424i	enriched	0.006	0.0	inf	5	3.22e-06	4.57e-06
+4	class	fisher	Chloroflexia	enriched	0.015	0.001	23.997	6	3.22e-06	4.57e-06
+11	phylum	fisher	Chlorobiota	enriched	0.03	0.0	inf	4	2.96e-08	4.59e-08
+0	Biotic relationship	fisher	Free living, Parasite, Endosymbiont, Host, Intracellular	enriched	0.641	0.0	inf	59	1.89e-49	4.66e-49
+9	ED_RK_ratio	mann-whitney		higher	1.583	1.295	0.522	1241	6.00e-195	4.74e-194
+3	basic_count	mann-whitney		lower	34.0	37.0	-0.457	2196	4.71e-236	4.74e-235
+9	aromaticity	mann-whitney		lower	0.071	0.073	-0.133	1241	2.74e-14	4.77e-14
+3	length	mann-whitney		lower	400.0	400.0	0.219	2196	1.83e-55	4.78e-55
+3	Sequence length	mann-whitney		lower	400.0	400.0	0.219	2196	1.83e-55	4.78e-55
+5	Identity closest all	mann-whitney		lower	98.7	99.0	-0.044	773	3.98e-02	4.82e-02
+11	net_charge_pH7	mann-whitney		higher	6.866	-12.95	0.836	137	1.72e-63	4.88e-63
+7	class	fisher	Planctomycetia	enriched	0.024	0.005	4.406	6	3.79e-03	4.96e-03
+8	ED_IK_ratio	mann-whitney		lower	1.173	2.333	-0.413	467	1.98e-51	4.96e-51
+4	class	fisher	Anaerolineae	enriched	0.114	0.001	109.052	45	1.92e-53	4.96e-53
+7	Salinity	fisher	Mesophilic, Non-halophilic	enriched	0.733	0.05	52.617	11	3.06e-11	5.03e-11
+2	length	mann-whitney		lower	385.5	400.0	-0.663	168	2.13e-49	5.20e-49
+2	Sequence length	mann-whitney		lower	385.5	400.0	-0.663	168	2.13e-49	5.20e-49
+4	class	fisher	Ardenticatenia	enriched	0.01	0.0	47.77	4	3.75e-05	5.25e-05
+10	pI	mann-whitney		higher	7.698	5.247	0.717	165	1.98e-56	5.29e-56
+8	acidic_ratio	mann-whitney		higher	0.152	0.128	0.932	467	4.87e-254	5.30e-253
+3	aromaticity	mann-whitney		lower	0.07	0.076	-0.188	2196	2.35e-41	5.34e-41
+2	net_charge_pH7	mann-whitney		higher	-8.49	-12.857	0.248	168	3.48e-08	5.37e-08
+9	Sequence length	mann-whitney		lower	399.0	400.0	-0.166	1241	2.91e-21	5.47e-21
+9	length	mann-whitney		lower	399.0	400.0	-0.166	1241	2.91e-21	5.47e-21
+9	net_charge_pH7	mann-whitney		lower	-19.288	-10.861	-0.485	1241	8.74e-169	5.51e-168
+11	Identity closest query	mann-whitney		lower	38.0	41.8	-0.252	137	3.77e-07	5.54e-07
+11	Identity closest known	mann-whitney		lower	38.0	41.8	-0.252	137	3.77e-07	5.54e-07
+4	Sequence length	mann-whitney		higher	419.0	400.0	0.507	472	1.74e-77	5.55e-77
+4	length	mann-whitney		higher	419.0	400.0	0.507	472	1.74e-77	5.55e-77
+4	Melting temperature	mann-whitney		higher	51.33	49.32	0.264	472	2.92e-22	5.56e-22
+5	MW	mann-whitney		lower	43575.676	44000.491	-0.177	773	3.14e-16	5.59e-16
+2	pI	mann-whitney		higher	5.602	5.253	0.265	168	3.53e-09	5.63e-09
+9	Optimum pH	mann-whitney		lower	7.448	7.507	-0.207	1241	2.70e-32	5.67e-32
+6	class	fisher	Ktedonobacteria	enriched	0.047	0.002	25.904	35	2.90e-27	5.76e-27
+8	class	fisher	Bacilli	enriched	1.0	0.274	inf	464	5.45e-249	5.77e-248
+5	basic_count	mann-whitney		higher	40.0	36.0	0.242	773	2.81e-29	5.83e-29
+3	ED_IK_ratio	mann-whitney		higher	2.522	1.75	0.324	2196	1.29e-119	5.84e-119
+5	class	fisher	Candidatus Limnocylindria	enriched	0.004	0.0	inf	3	4.43e-04	5.93e-04
+4	aromaticity	mann-whitney		higher	0.078	0.072	0.077	472	4.60e-03	6.00e-03
+6	class	fisher	Erysipelotrichia	enriched	0.004	0.0	inf	3	4.52e-04	6.03e-04
+5	class	fisher	Actinomycetes	enriched	0.925	0.543	10.317	687	1.47e-109	6.06e-109
+2	aromaticity	mann-whitney		lower	0.061	0.072	-0.565	168	2.88e-36	6.17e-36
+0	instability_index	mann-whitney		lower	37.205	41.44	-0.421	1298	1.25e-132	6.19e-132
+1	Disease	fisher	Anthrax, anthrax	enriched	0.065	0.0	inf	14	4.73e-04	6.29e-04
+6	basic_ratio	mann-whitney		lower	0.087	0.092	-0.133	797	4.01e-10	6.51e-10
+6	Relative aggregation propensity	mann-whitney		higher	1.316	0.726	0.676	797	6.97e-221	6.53e-220
+5	class	fisher	Thermoleophilia	enriched	0.011	0.0	48.931	8	4.35e-08	6.69e-08
+8	Salinity	fisher	Non-halophilic	enriched	0.327	0.089	4.98	33	4.22e-09	6.69e-09
+1	ED_RK_ratio	mann-whitney		lower	1.262	1.421	-0.184	1993	3.10e-37	6.72e-37
+1	Disease	fisher	Opportunistic infections	enriched	0.084	0.0	inf	18	4.92e-05	6.86e-05
+9	basic_ratio	mann-whitney		lower	0.085	0.092	-0.393	1241	1.69e-111	7.10e-111
+11	basic_count	mann-whitney		higher	48.0	36.0	0.805	137	2.56e-59	7.12e-59
+5	instability_index	mann-whitney		higher	51.018	40.564	0.602	773	1.10e-170	7.16e-170
+8	Disease	fisher	Non-disease	enriched	0.765	0.0	inf	39	3.13e-42	7.16e-42
+6	Optimum pH	mann-whitney		higher	7.565	7.496	0.216	797	3.76e-24	7.22e-24
+4	class	fisher	Myxococcia	enriched	0.051	0.01	5.03	20	4.75e-08	7.28e-08
+4	phylum	fisher	Nitrospirota	enriched	0.06	0.0	inf	28	3.25e-38	7.28e-38
+1	GRAVY	mann-whitney		lower	-0.167	-0.076	-0.512	1993	6.01e-275	7.34e-274
+5	GRAVY	mann-whitney		higher	-0.044	-0.109	0.279	773	3.35e-38	7.46e-38
+7	MW	mann-whitney		higher	45689.314	43845.993	0.528	267	3.08e-49	7.47e-49
+10	net_charge_pH7	mann-whitney		higher	1.606	-13.03	0.736	165	2.71e-59	7.47e-59
+0	Disease	fisher	Pulmonary	enriched	0.128	0.0	inf	12	4.91e-08	7.50e-08
+8	instability_index	mann-whitney		lower	38.827	40.899	-0.075	467	5.81e-03	7.55e-03
+6	acidic_ratio	mann-whitney		lower	0.117	0.131	-0.248	797	3.67e-31	7.67e-31
+11	class	fisher	Alphaproteobacteria	enriched	0.043	0.01	4.665	5	5.94e-03	7.70e-03
+10	Optimum pH	mann-whitney		higher	7.724	7.499	0.594	165	3.42e-39	7.75e-39
+10	GRAVY	mann-whitney		higher	0.006	-0.103	0.427	165	4.19e-21	7.86e-21
+0	net_charge_pH7	mann-whitney		higher	-5.758	-15.199	0.54	1298	9.08e-217	7.95e-216
+4	Relative aggregation propensity	mann-whitney		higher	0.891	0.756	0.075	472	6.17e-03	7.97e-03
+11	class	fisher	Terriglobia	enriched	0.078	0.014	5.822	9	5.85e-05	8.13e-05
+8	acidic_count	mann-whitney		higher	60.0	51.0	0.871	467	8.50e-223	8.16e-222
+1	Disease	fisher	Food poisoning	enriched	0.159	0.013	14.072	34	5.59e-07	8.20e-07
+11	acidic_count	mann-whitney		lower	41.0	52.0	-0.491	137	4.31e-23	8.22e-23
+2	instability_index	mann-whitney		lower	37.973	40.942	-0.339	168	4.75e-14	8.25e-14
+0	ED_IK_ratio	mann-whitney		higher	2.625	2.115	0.385	1298	2.03e-111	8.43e-111
+11	class	fisher	Planctomycetia	enriched	0.052	0.005	10.036	6	6.14e-05	8.50e-05
+10	length	mann-whitney		higher	424.0	400.0	0.814	165	2.84e-72	8.60e-72
+10	Sequence length	mann-whitney		higher	424.0	400.0	0.814	165	2.84e-72	8.60e-72
+4	phylum	fisher	Verrucomicrobiota	enriched	0.053	0.001	106.723	25	4.18e-29	8.64e-29
+0	Temp. range	fisher	Mesophilic	enriched	0.992	0.938	7.757	117	6.85e-03	8.81e-03
+3	instability_index	mann-whitney		higher	42.427	40.052	0.27	2196	2.63e-83	8.92e-83
+5	Melting temperature	mann-whitney		higher	57.24	49.02	0.644	773	1.17e-194	9.04e-194
+4	class	fisher	Spartobacteria	enriched	0.018	0.0	84.244	7	5.76e-09	9.11e-09
+8	Optimum pH	mann-whitney		higher	7.623	7.497	0.229	467	5.07e-17	9.16e-17
+9	MW	mann-whitney		lower	43035.041	44157.483	-0.409	1241	2.01e-120	9.19e-120
+5	aromaticity	mann-whitney		lower	0.066	0.073	-0.351	773	3.36e-59	9.20e-59
+10	Identity closest query	mann-whitney		lower	25.5	42.3	-0.944	165	2.47e-96	9.32e-96
+10	Identity closest known	mann-whitney		lower	25.5	42.3	-0.944	165	2.47e-96	9.32e-96
+8	Temp. range	fisher	Mesophilic, Thermophilic	enriched	0.315	0.006	71.289	35	4.55e-29	9.35e-29
+1	Salinity	fisher	Mesophilic, Moderate halophilic, Non-halophilic	enriched	0.589	0.047	29.392	238	3.96e-46	9.40e-46
+7	Optimum pH	mann-whitney		higher	7.726	7.496	0.68	267	2.85e-80	9.41e-80
+8	GRAVY	mann-whitney		lower	-0.239	-0.094	-0.784	467	1.38e-180	9.44e-180
+1	Transmembrane	fisher	o	enriched	1.0	0.997	inf	1993	7.37e-03	9.46e-03
+10	basic_ratio	mann-whitney		lower	0.086	0.091	-0.312	165	5.69e-12	9.47e-12
+4	phylum	fisher	Myxococcota	enriched	0.047	0.011	4.526	22	6.31e-08	9.60e-08
+6	instability_index	mann-whitney		lower	37.804	41.133	-0.324	797	3.76e-52	9.64e-52
+4	class	fisher	Clostridia	enriched	0.046	0.015	3.138	18	6.99e-05	9.65e-05
+11	acidic_ratio	mann-whitney		lower	0.095	0.129	-0.692	137	4.20e-44	9.73e-44
+3	Optimum pH	mann-whitney		lower	7.493	7.506	-0.101	2196	5.76e-13	9.75e-13
+11	ED_IK_ratio	mann-whitney		lower	2.263	2.263	0.132	137	7.67e-03	9.82e-03
+8	phylum	fisher	Bacillota	enriched	1.0	0.288	inf	467	9.51e-242	9.82e-241

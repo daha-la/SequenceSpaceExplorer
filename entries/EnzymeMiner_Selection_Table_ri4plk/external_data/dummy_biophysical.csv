@@ -1,0 +1,9 @@
+id,solubility_score,expression_host,custom_notes
+OleD_S1,0.82,E. coli,dummy test row
+Cca2GT_S2,0.61,E. coli,dummy test row
+AgepGT_S3,0.74,P. pastoris,dummy test row
+WP_382466767.1,0.55,E. coli,dummy test row
+QIS76123.1,0.69,E. coli,dummy test row
+MBK3522575.1,0.91,P. pastoris,dummy test row
+NOT_A_REAL_ID,0.70,E. coli,dummy test row
+ALSO_FAKE,0.65,E. coli,dummy test row
