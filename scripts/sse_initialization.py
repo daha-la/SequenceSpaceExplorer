@@ -6,7 +6,7 @@ Bootstrap-only creation tool. Turns one source file into
 `entries/<stem>/<stem>.sse.tsv` plus the entry's subfolders and a provenance
 manifest. Everything after creation (coordinates, RMSD, third-party labels) is
 added later by separate tools via the merge contract — never by re-running this
-script. See docs/SSE_datafile_spec.md.
+script. See SSE_datafile_spec.md.
 
 This script owns the creation pipeline: initialise folders, run a reader, run
 feature computation, assemble and write the datafile + manifest. The readers and

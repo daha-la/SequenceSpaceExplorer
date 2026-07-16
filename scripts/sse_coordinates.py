@@ -24,12 +24,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sse_tools.common import (SSEError, abort, COL_ID, TYPE_COORDINATE,
                               read_datafile, read_manifest, merge_columns,
-                              entry_dir, ENTRIES_DIR, INITIAL_FILES_DIR)
+                              entry_dir, ENTRIES_DIR, INITIAL_FILES_DIR,
+                              NORMALIZED_SUBDIR)
 from sse_tools.embedders import REGISTRY as EMBEDDERS, EmbedContext
 from sse_tools.reducers import REGISTRY as REDUCERS
 
@@ -82,6 +84,41 @@ def report_skips(skip, total):
 
 
 
+def l2_normalize(values: np.ndarray) -> np.ndarray:
+    """Scale each row vector to unit L2 length; leave any zero vector untouched.
+
+    ESM-C vectors are already near-unit-length, so this barely moves them, but
+    applying it makes the cosine geometry explicit and gives every consumer -
+    the visualization reducer, the transparent normalized cache, and downstream
+    clustering - one identical set of vectors to act on.
+    """
+    norms = np.linalg.norm(values, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    return values / norms
+
+
+def write_normalized_cache(ids, dims, normalized: np.ndarray,
+                           raw_emb_path: Path) -> Path:
+    """Write the L2-normalized matrix as a transparent sibling of the raw cache.
+
+    Regenerated in full on every successful run, so it can never drift out of
+    sync with <tag>.emb.tsv (including after a --reembed). Written under
+    embeddings/normalized/ with the same filename and schema: identical enough
+    to review side by side with the raw cache, but out of the non-recursive
+    embeddings/*.emb.tsv glob so it does not trip the single-cache auto-detection
+    in the distance/coordinate tools.
+    """
+    out_df = pd.DataFrame(normalized, columns=list(dims))
+    out_df.insert(0, "ID", ids)
+    out_dir = raw_emb_path.parent / NORMALIZED_SUBDIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / raw_emb_path.name
+    tmp = out_path.parent / (out_path.name + ".part")
+    out_df.to_csv(tmp, sep="\t", index=False)
+    tmp.replace(out_path)
+    return out_path
+
+
 def coordinate_system_columns(types: dict, tag: str, reducer_label: str) -> list:
     """Existing coordinate columns belonging to this tag+reducer system."""
     prefix = f"{tag}_{reducer_label}"
@@ -109,6 +146,11 @@ def build_parser():
                    help="dimensionality reduction (default: pca).")
     p.add_argument("--pooling", default="mean", choices=["mean", "max", "min"],
                    help="pooling over residues (default: mean).")
+    p.add_argument("--normalize", action=argparse.BooleanOptionalAction, default=True,
+                   help="L2-normalize embeddings before reducing, and write a "
+                        "normalized cache under embeddings/normalized/ that "
+                        "downstream tools prefer (default: on). --no-normalize "
+                        "reduces on raw vectors and writes no normalized cache.")
     p.add_argument("--device", default="auto",
                    choices=["auto", "cuda", "mps", "cpu"],
                    help="compute device (default: auto -> cuda > mps > cpu). "
@@ -128,6 +170,11 @@ def build_parser():
                    help="UMAP metric (default: euclidean).")
     p.add_argument("--tsne-perplexity", type=float, default=30.0,
                    help="t-SNE perplexity (default: 30; auto-capped below n_samples).")
+    p.add_argument("--tsne-pca", type=int, default=50,
+                   help="project onto this many principal components before running "
+                        "t-SNE (default: 50). Denoises the neighbor structure and "
+                        "speeds up the run; 0 disables it and feeds t-SNE the full "
+                        "embedding. Skipped when the embedding is already narrower.")
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--write-every", type=int, default=1000)
     p.add_argument("--max-residues", type=int, default=1500,
@@ -150,6 +197,7 @@ def build_parser():
                         "--reembed to recompute embeddings.")
     p.add_argument("--entries-dir")
     p.add_argument("--initial-files-dir")
+    p.add_argument("--limit", type=int, help=argparse.SUPPRESS)
     return p
 
 
@@ -161,12 +209,18 @@ def main(argv=None):
     try:
         datafile, edir, stem = resolve_entry(args.entry, entries_dir)
         df, types = read_datafile(datafile)
+        if args.limit is not None:
+            if args.limit < 1:
+                abort("--limit must be at least 1.")
+            df = df.head(args.limit).copy()
         manifest_path = edir / "logs" / f"{stem}{DATAFILE_SUFFIX[:-4]}.manifest.json"
         manifest = read_manifest(manifest_path) if manifest_path.exists() else {}
 
         embedder = EMBEDDERS[args.embedder]
         reducer = REDUCERS[args.reducer]
         tag = args.label or embedder.tag(args)
+        if args.limit is not None:
+            tag = f"{tag}_first{args.limit}"
         overwrite_coordinates = bool(args.force or args.reembed or args.rereduce)
         force_embedding = bool(args.reembed)
 
@@ -218,7 +272,27 @@ def main(argv=None):
         matrix = embedder.embed(entries, emb_path, args)
 
         ids = matrix["ID"].astype(str).values
-        X = matrix.drop(columns=["ID"]).to_numpy()
+        dims = [c for c in matrix.columns if c != "ID"]
+        X = matrix[dims].to_numpy(dtype=np.float64)
+        if args.normalize:
+            # L2-normalize once, then feed that SAME geometry to both the reducer
+            # and the transparent normalized cache, so the coordinates written to
+            # the datafile and any downstream analysis (distance, clustering) all
+            # act on one set of vectors.
+            X = l2_normalize(X)
+            norm_path = write_normalized_cache(ids, dims, X, emb_path)
+            print(f"  L2-normalized copy: {norm_path}")
+        else:
+            existing_norm = emb_path.parent / NORMALIZED_SUBDIR / emb_path.name
+            if existing_norm.exists():
+                print(f"  WARNING: --no-normalize, but a normalized cache exists at "
+                      f"{existing_norm}.\n"
+                      f"           Downstream tools prefer it, so they will still "
+                      f"act on normalized vectors while these coordinates use raw "
+                      f"ones.\n"
+                      f"           Delete that file (or re-run with --normalize) to "
+                      f"move the whole pipeline to raw geometry.")
+
         coords, meta = reducer.reduce(X, args.n_components, args)
         k = meta.get("k", coords.shape[1])
 
@@ -233,7 +307,8 @@ def main(argv=None):
 
         params = (f"embedder={args.embedder};model="
                   f"{args.esmc_model if args.embedder == 'esmc' else args.embedder};"
-                  f"pooling={args.pooling};reducer={args.reducer};n={k}")
+                  f"pooling={args.pooling};normalize={'l2' if args.normalize else 'none'};"
+                  f"reducer={args.reducer};n={k}")
         if existing_system_cols and overwrite_coordinates:
             print(f"replacing existing coordinate system '{tag}_{reducer.label}' "
                   f"({len(existing_system_cols)} old column(s)).")
