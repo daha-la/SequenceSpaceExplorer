@@ -1,0 +1,3 @@
+$ node runner/server.mjs
+Sequence Space Explorer runner listening at http://127.0.0.1:8788
+Pipeline root: /Users/wpgaard/Documents/SequenceSpaceExplorer-main

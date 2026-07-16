@@ -1,0 +1,9 @@
+$ WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev
+
+  vinext dev  (Vite 8.0.13)
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Debug:   http://localhost:3000/__debug
+ GET / 200 in 521ms (compile: 1784129267.1s, render: 480ms)
+ GET / 200 in 96ms (compile: 1784129267.1s, render: 72ms)
+  ➜  Tunnel closed

@@ -1,0 +1,1072 @@
+[
+  {
+    "id": "5c35514f-7e8b-4070-8b72-dbc6212c1a70",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "failed",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T13:42:59.896Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-15T13:43:02.131Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-15T13:43:02.132Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-15T13:43:02.132Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T13:43:02.132Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T13:43:02.152Z",
+        "stream": "stderr",
+        "text": "Address already in use"
+      },
+      {
+        "at": "2026-07-15T13:43:02.152Z",
+        "stream": "stderr",
+        "text": "Port 8051 is in use by another program. Either identify and stop that program, or start the server with a different port."
+      },
+      {
+        "at": "2026-07-15T13:43:02.341Z",
+        "stream": "system",
+        "text": "Process exited with code 1."
+      }
+    ],
+    "createdAt": "2026-07-15T13:42:59.887Z",
+    "startedAt": "2026-07-15T13:42:59.892Z",
+    "pid": 61287,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "exitCode": 1,
+    "finishedAt": "2026-07-15T13:43:02.341Z"
+  },
+  {
+    "id": "d5201863-ae65-4b46-9d56-fe31cd63882a",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "failed",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T03:41:59.782Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-15T03:42:01.946Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-15T03:42:01.946Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-15T03:42:01.947Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T03:42:01.947Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T03:42:01.964Z",
+        "stream": "stderr",
+        "text": "Address already in use"
+      },
+      {
+        "at": "2026-07-15T03:42:01.965Z",
+        "stream": "stderr",
+        "text": "Port 8051 is in use by another program. Either identify and stop that program, or start the server with a different port."
+      },
+      {
+        "at": "2026-07-15T03:42:02.086Z",
+        "stream": "system",
+        "text": "Process exited with code 1."
+      }
+    ],
+    "createdAt": "2026-07-15T03:41:59.775Z",
+    "startedAt": "2026-07-15T03:41:59.777Z",
+    "pid": 55850,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "exitCode": 1,
+    "finishedAt": "2026-07-15T03:42:02.086Z"
+  },
+  {
+    "id": "11de5bd8-ed4a-4b81-a607-a2e7f21364d4",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "failed",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T02:16:04.059Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-15T02:16:06.229Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-15T02:16:06.229Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-15T02:16:06.229Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T02:16:06.229Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T02:16:06.249Z",
+        "stream": "stderr",
+        "text": "Address already in use"
+      },
+      {
+        "at": "2026-07-15T02:16:06.249Z",
+        "stream": "stderr",
+        "text": "Port 8051 is in use by another program. Either identify and stop that program, or start the server with a different port."
+      },
+      {
+        "at": "2026-07-15T02:16:06.351Z",
+        "stream": "system",
+        "text": "Process exited with code 1."
+      }
+    ],
+    "createdAt": "2026-07-15T02:16:04.053Z",
+    "startedAt": "2026-07-15T02:16:04.056Z",
+    "pid": 54712,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "exitCode": 1,
+    "finishedAt": "2026-07-15T02:16:06.351Z"
+  },
+  {
+    "id": "1538b83c-383a-4417-a30b-627cf968d4d4",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "failed",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T01:38:36.095Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-15T01:38:38.305Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-15T01:38:38.306Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-15T01:38:38.306Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T01:38:38.306Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T01:38:38.325Z",
+        "stream": "stderr",
+        "text": "Address already in use"
+      },
+      {
+        "at": "2026-07-15T01:38:38.325Z",
+        "stream": "stderr",
+        "text": "Port 8051 is in use by another program. Either identify and stop that program, or start the server with a different port."
+      },
+      {
+        "at": "2026-07-15T01:38:38.531Z",
+        "stream": "system",
+        "text": "Process exited with code 1."
+      }
+    ],
+    "createdAt": "2026-07-15T01:38:36.089Z",
+    "startedAt": "2026-07-15T01:38:36.092Z",
+    "pid": 53602,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "exitCode": 1,
+    "finishedAt": "2026-07-15T01:38:38.531Z"
+  },
+  {
+    "id": "28c39af2-17d8-4b43-be93-1481d3387de0",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "failed",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T01:36:03.715Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-15T01:36:05.956Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-15T01:36:05.957Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-15T01:36:05.957Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T01:36:05.957Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T01:36:05.981Z",
+        "stream": "stderr",
+        "text": "Address already in use"
+      },
+      {
+        "at": "2026-07-15T01:36:05.981Z",
+        "stream": "stderr",
+        "text": "Port 8051 is in use by another program. Either identify and stop that program, or start the server with a different port."
+      },
+      {
+        "at": "2026-07-15T01:36:06.086Z",
+        "stream": "system",
+        "text": "Process exited with code 1."
+      }
+    ],
+    "createdAt": "2026-07-15T01:36:03.704Z",
+    "startedAt": "2026-07-15T01:36:03.712Z",
+    "pid": 53372,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "exitCode": 1,
+    "finishedAt": "2026-07-15T01:36:06.086Z"
+  },
+  {
+    "id": "becf77fc-199c-4959-9b99-21b79748752f",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "cancelled",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T00:46:28.675Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-15T00:46:31.244Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-15T00:46:31.244Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-15T00:46:31.245Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T00:46:31.245Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T00:46:41.847Z",
+        "stream": "stderr",
+        "text": "/opt/anaconda3/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown"
+      },
+      {
+        "at": "2026-07-15T00:46:41.847Z",
+        "stream": "stderr",
+        "text": "  warnings.warn('resource_tracker: There appear to be %d '"
+      },
+      {
+        "at": "2026-07-15T00:46:41.854Z",
+        "stream": "system",
+        "text": "Process stopped by SIGTERM."
+      }
+    ],
+    "createdAt": "2026-07-15T00:46:28.651Z",
+    "startedAt": "2026-07-15T00:46:28.668Z",
+    "pid": 27861,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "exitCode": null,
+    "finishedAt": "2026-07-15T00:46:41.854Z"
+  },
+  {
+    "id": "e0a6e204-d6c3-4ef8-b0a1-43d9773331ce",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8071"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8071",
+    "writesEntry": false,
+    "values": {
+      "port": 8071
+    },
+    "status": "cancelled",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T00:45:39.640Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8071"
+      },
+      {
+        "at": "2026-07-15T00:45:41.853Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8071"
+      },
+      {
+        "at": "2026-07-15T00:45:41.853Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8071/"
+      },
+      {
+        "at": "2026-07-15T00:45:41.854Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T00:45:41.854Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T00:45:42.765Z",
+        "stream": "stderr",
+        "text": "/opt/anaconda3/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown"
+      },
+      {
+        "at": "2026-07-15T00:45:42.765Z",
+        "stream": "stderr",
+        "text": "  warnings.warn('resource_tracker: There appear to be %d '"
+      },
+      {
+        "at": "2026-07-15T00:45:42.769Z",
+        "stream": "system",
+        "text": "Process stopped by SIGTERM."
+      }
+    ],
+    "createdAt": "2026-07-15T00:45:39.638Z",
+    "startedAt": "2026-07-15T00:45:39.639Z",
+    "pid": 26493,
+    "url": "http://127.0.0.1:8071",
+    "ready": true,
+    "exitCode": null,
+    "finishedAt": "2026-07-15T00:45:42.769Z"
+  },
+  {
+    "id": "115839e6-efea-458d-92f1-812cca578cab",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8071"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8071",
+    "writesEntry": false,
+    "values": {
+      "port": 8071
+    },
+    "status": "cancelled",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-15T00:45:02.333Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8071"
+      },
+      {
+        "at": "2026-07-15T00:45:05.534Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8071"
+      },
+      {
+        "at": "2026-07-15T00:45:05.534Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8071/"
+      },
+      {
+        "at": "2026-07-15T00:45:05.534Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-15T00:45:05.534Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-15T00:45:24.106Z",
+        "stream": "stderr",
+        "text": "/opt/anaconda3/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown"
+      },
+      {
+        "at": "2026-07-15T00:45:24.106Z",
+        "stream": "stderr",
+        "text": "  warnings.warn('resource_tracker: There appear to be %d '"
+      },
+      {
+        "at": "2026-07-15T00:45:24.110Z",
+        "stream": "system",
+        "text": "Process stopped by SIGTERM."
+      }
+    ],
+    "createdAt": "2026-07-15T00:45:02.330Z",
+    "startedAt": "2026-07-15T00:45:02.332Z",
+    "pid": 16734,
+    "url": "http://127.0.0.1:8071",
+    "ready": true,
+    "exitCode": null,
+    "finishedAt": "2026-07-15T00:45:24.110Z"
+  },
+  {
+    "id": "7dd435d4-4a08-4f55-9cc6-96079c561478",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T23:27:35.864Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T23:27:38.091Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T23:27:38.091Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T23:27:38.091Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T23:27:38.091Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T23:27:39.788Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      }
+    ],
+    "createdAt": "2026-07-14T23:27:35.850Z",
+    "startedAt": "2026-07-14T23:27:35.856Z",
+    "pid": 15059,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-15T00:44:38.397Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "603da1b5-dad9-4f55-af41-844efe3bcb47",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T22:23:19.602Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T22:23:21.787Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T22:23:21.788Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T22:23:21.788Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T22:23:21.788Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T22:23:23.602Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      }
+    ],
+    "createdAt": "2026-07-14T22:23:19.590Z",
+    "startedAt": "2026-07-14T22:23:19.597Z",
+    "pid": 13273,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-14T23:22:08.938Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "d8351b26-a8fd-4c19-8aed-d94b5b5f0d68",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T22:09:13.043Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T22:09:15.003Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T22:09:15.003Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T22:09:15.004Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T22:09:15.004Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T22:09:16.684Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      }
+    ],
+    "createdAt": "2026-07-14T22:09:13.041Z",
+    "startedAt": "2026-07-14T22:09:13.042Z",
+    "pid": 12399,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-14T22:22:26.517Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "73e81f06-8f2e-4562-8e88-6503fe144443",
+    "tool": "distance",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_esmc_distance.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--embedding",
+      "esmc600m_mean"
+    ],
+    "command": "python scripts/sse_esmc_distance.py EnzymeMiner_Selection_Table_ri4plk --embedding esmc600m_mean",
+    "writesEntry": true,
+    "values": {
+      "embedding": "esmc600m_mean",
+      "queryMode": "marked",
+      "queryIds": "OleD_S1, AgepGT_S3",
+      "raw": false,
+      "force": false
+    },
+    "status": "succeeded",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T22:09:03.978Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_esmc_distance.py EnzymeMiner_Selection_Table_ri4plk --embedding esmc600m_mean"
+      },
+      {
+        "at": "2026-07-14T22:09:04.622Z",
+        "stream": "stdout",
+        "text": "using L2-normalized embeddings: /Users/wpgaard/Documents/SequenceSpaceExplorer-main/entries/EnzymeMiner_Selection_Table_ri4plk/embeddings/normalized/esmc600m_mean.emb.tsv"
+      },
+      {
+        "at": "2026-07-14T22:09:06.554Z",
+        "stream": "stdout",
+        "text": "merged 4 distance column(s) for 9974/9974 embedded rows into /Users/wpgaard/Documents/SequenceSpaceExplorer-main/entries/EnzymeMiner_Selection_Table_ri4plk/EnzymeMiner_Selection_Table_ri4plk.sse.tsv"
+      },
+      {
+        "at": "2026-07-14T22:09:06.554Z",
+        "stream": "stdout",
+        "text": "  OleD_S1: esmc600m_mean_distance_to_OleD_S1"
+      },
+      {
+        "at": "2026-07-14T22:09:06.554Z",
+        "stream": "stdout",
+        "text": "  Cca2GT_S2: esmc600m_mean_distance_to_Cca2GT_S2"
+      },
+      {
+        "at": "2026-07-14T22:09:06.554Z",
+        "stream": "stdout",
+        "text": "  AgepGT_S3: esmc600m_mean_distance_to_AgepGT_S3"
+      },
+      {
+        "at": "2026-07-14T22:09:06.554Z",
+        "stream": "stdout",
+        "text": "  SpetGT_S4: esmc600m_mean_distance_to_SpetGT_S4"
+      },
+      {
+        "at": "2026-07-14T22:09:06.606Z",
+        "stream": "system",
+        "text": "Process exited with code 0."
+      }
+    ],
+    "createdAt": "2026-07-14T22:09:03.972Z",
+    "startedAt": "2026-07-14T22:09:03.976Z",
+    "pid": 12387,
+    "exitCode": 0,
+    "finishedAt": "2026-07-14T22:09:06.606Z"
+  },
+  {
+    "id": "c4a88668-ea39-4523-811c-39bc285242ba",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T22:05:53.617Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T22:05:55.724Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T22:05:55.724Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T22:05:55.725Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T22:05:55.725Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T22:05:57.386Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      }
+    ],
+    "createdAt": "2026-07-14T22:05:53.612Z",
+    "startedAt": "2026-07-14T22:05:53.615Z",
+    "pid": 12063,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-14T22:08:50.074Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "f9a8d8d9-cc3e-4ceb-9a10-7463539cb8f4",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T21:53:49.304Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T21:53:51.480Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T21:53:51.480Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T21:53:51.480Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T21:53:51.480Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T21:53:53.153Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      }
+    ],
+    "createdAt": "2026-07-14T21:53:49.297Z",
+    "startedAt": "2026-07-14T21:53:49.301Z",
+    "pid": 10418,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-14T22:04:34.624Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "a04e2762-56b7-41bd-b558-9cb2595868a5",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T21:18:47.020Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T21:18:49.479Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T21:18:49.480Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T21:18:49.480Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T21:18:49.480Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T21:18:51.409Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      }
+    ],
+    "createdAt": "2026-07-14T21:18:47.012Z",
+    "startedAt": "2026-07-14T21:18:47.015Z",
+    "pid": 6458,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-14T21:24:30.420Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "72cd05f3-8a41-4010-8e6f-7fae802ed104",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8051"
+    ],
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051",
+    "writesEntry": false,
+    "values": {
+      "port": 8051
+    },
+    "status": "interrupted",
+    "progress": 100,
+    "logs": [
+      {
+        "at": "2026-07-14T20:46:17.140Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8051"
+      },
+      {
+        "at": "2026-07-14T20:46:29.390Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T20:46:29.392Z",
+        "stream": "stdout",
+        "text": "Dash is running on http://127.0.0.1:8051/"
+      },
+      {
+        "at": "2026-07-14T20:46:29.392Z",
+        "stream": "stdout",
+        "text": " * Serving Flask app 'sse_visualizer'"
+      },
+      {
+        "at": "2026-07-14T20:46:29.392Z",
+        "stream": "stdout",
+        "text": " * Debug mode: on"
+      },
+      {
+        "at": "2026-07-14T20:46:31.693Z",
+        "stream": "stdout",
+        "text": "Starting Sequence Space Explorer for EnzymeMiner_Selection_Table_ri4plk on http://127.0.0.1:8051"
+      },
+      {
+        "at": "2026-07-14T20:47:13.461Z",
+        "stream": "stderr",
+        "text": "Fontconfig warning: ignoring UTF-8: not a valid region tag"
+      },
+      {
+        "at": "2026-07-14T20:47:17.405Z",
+        "stream": "stderr",
+        "text": "Matplotlib is building the font cache; this may take a moment."
+      }
+    ],
+    "createdAt": "2026-07-14T20:46:17.128Z",
+    "startedAt": "2026-07-14T20:46:17.135Z",
+    "pid": 2739,
+    "url": "http://127.0.0.1:8051",
+    "ready": true,
+    "finishedAt": "2026-07-14T21:10:48.601Z",
+    "error": "The local runner restarted before this job finished."
+  },
+  {
+    "id": "f8191f91-58e8-4958-8837-41b5ccfe8db0",
+    "tool": "visualizer",
+    "entry": "EnzymeMiner_Selection_Table_ri4plk",
+    "args": [
+      "/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py",
+      "EnzymeMiner_Selection_Table_ri4plk",
+      "--port",
+      "8059"
+    ],
+    "secrets": {},
+    "command": "python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8059",
+    "writesEntry": false,
+    "values": {
+      "port": 8059
+    },
+    "status": "failed",
+    "progress": null,
+    "logs": [
+      {
+        "at": "2026-07-14T18:59:02.021Z",
+        "stream": "system",
+        "text": "Started python scripts/sse_visualizer.py EnzymeMiner_Selection_Table_ri4plk --port 8059"
+      },
+      {
+        "at": "2026-07-14T18:59:02.283Z",
+        "stream": "stderr",
+        "text": "Traceback (most recent call last):"
+      },
+      {
+        "at": "2026-07-14T18:59:02.283Z",
+        "stream": "stderr",
+        "text": "  File \"/Users/wpgaard/Documents/SequenceSpaceExplorer-main/scripts/sse_visualizer.py\", line 28, in <module>"
+      },
+      {
+        "at": "2026-07-14T18:59:02.284Z",
+        "stream": "stderr",
+        "text": "    import numpy as np"
+      },
+      {
+        "at": "2026-07-14T18:59:02.284Z",
+        "stream": "stderr",
+        "text": "ModuleNotFoundError: No module named 'numpy'"
+      },
+      {
+        "at": "2026-07-14T18:59:02.288Z",
+        "stream": "system",
+        "text": "Process exited with code 1."
+      }
+    ],
+    "createdAt": "2026-07-14T18:59:02.018Z",
+    "startedAt": "2026-07-14T18:59:02.019Z",
+    "pid": 91393,
+    "exitCode": 1,
+    "finishedAt": "2026-07-14T18:59:02.288Z"
+  }
+]
