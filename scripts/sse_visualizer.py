@@ -4,9 +4,8 @@ Run:
     python scripts/sse_visualizer.py <entry-stem|entry-dir|datafile.sse.tsv>
 
 The app reads exactly one .sse.tsv datafile, using the Type row as the contract:
-id / label / coordinate. Selected points can be exported to a selection cache on
-disk; the Boltz-2 structure-prediction and RMSD workflow that consumes those
-selections runs in the pipeline (scripts/sse_boltz.py), not here.
+id / label / coordinate. Structure prediction and RMSD are exposed in the UI,
+but the heavy logic lives in sse_tools.boltz and sse_tools.rmsd.
 """
 
 from __future__ import annotations
@@ -45,7 +44,9 @@ from sse_tools.visualizer_state import (
     resolve_entry,
 )
 from sse_tools import layers as layer_store
-from sse_tools import selections as selection_cache
+from sse_tools import jobs as job_store
+from sse_tools import boltz as boltz_backend
+from sse_tools import rmsd as rmsd_backend
 
 PORT = 8051
 
@@ -107,33 +108,9 @@ _y_col: Optional[str] = None
 _query_ids: list[str] = []
 _name_cols: list[str] = []
 
+_boltz_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+_boltz_futures: dict[str, concurrent.futures.Future] = {}
 _STATE_LOCK = threading.RLock()
-
-# Numeric/string coercion caches. read_datafile loads every column as a string
-# (dtype=str), and each figure render re-derives the same numeric coordinate and
-# colour columns — and the string id column — many times per call. The dataframe
-# is immutable between reloads, so these coercions are stable; cache them keyed by
-# column name and clear the caches in reload_state whenever the datafile is swapped.
-_num_cache: dict[str, pd.Series] = {}
-_id_str_cache: Optional[pd.Series] = None
-
-
-def numeric_col(col: str) -> pd.Series:
-    """Float coercion of a datafile column, computed once per reload and cached."""
-    cached = _num_cache.get(col)
-    if cached is None:
-        s = _ann_df[col] if col in _ann_df.columns else pd.Series(pd.NA, index=_ann_df.index)
-        cached = pd.to_numeric(s, errors="coerce")
-        _num_cache[col] = cached
-    return cached
-
-
-def id_str() -> pd.Series:
-    """The id column as strings, computed once per reload and cached."""
-    global _id_str_cache
-    if _id_str_cache is None:
-        _id_str_cache = _ann_df[_id_col].astype(str)
-    return _id_str_cache
 
 
 def reload_state() -> tuple[str, list]:
@@ -150,7 +127,7 @@ def reload_state() -> tuple[str, list]:
     keeps logs/layers.json in sync with whatever the datafile now contains.
     layers.json on disk is treated as canonical, per §14.4.
     """
-    global _STATE, _ann_df, _types, _col_meta, _id_col, _x_col, _y_col, _query_ids, _name_cols, _id_str_cache
+    global _STATE, _ann_df, _types, _col_meta, _id_col, _x_col, _y_col, _query_ids, _name_cols
     new_state = load_visualizer_state(ENTRY)
     with _STATE_LOCK:
         _STATE = new_state
@@ -162,9 +139,6 @@ def reload_state() -> tuple[str, list]:
         _y_col = new_state.y_col
         _query_ids = new_state.query_ids
         _name_cols = new_state.name_cols
-        _num_cache.clear()
-        _REGION_CACHE.clear()
-        _id_str_cache = None
         valid_ids = new_state.df[new_state.id_col].astype(str).tolist()
 
     current_layers = layer_store.read_layers(ENTRY.layers_path)
@@ -204,7 +178,7 @@ def apply_filters(pool_df, cont_conditions, bool_conditions, cat_conditions, tag
     mask = pd.Series(True, index=pool_df.index)
     for col, lo, hi in cont_conditions:
         if col in pool_df.columns:
-            num = numeric_col(col).loc[pool_df.index]
+            num = pd.to_numeric(pool_df[col], errors="coerce")
             mask &= num.between(lo, hi, inclusive="both")
     for col, val in bool_conditions:
         if col in pool_df.columns:
@@ -217,7 +191,7 @@ def apply_filters(pool_df, cont_conditions, bool_conditions, cat_conditions, tag
             selected = set(selected_tags)
             mask &= pool_df[col].apply(lambda cell: bool({t.strip() for t in str(cell).split(",") if t.strip()} & selected) if str(cell) else False)
     if id_search_ids:
-        id_match = id_str().loc[pool_df.index].isin([str(x) for x in id_search_ids])
+        id_match = pool_df[_id_col].astype(str).isin([str(x) for x in id_search_ids])
         name_match = pd.Series(False, index=pool_df.index)
         for nc in _name_cols:
             if nc in pool_df.columns:
@@ -227,6 +201,24 @@ def apply_filters(pool_df, cont_conditions, bool_conditions, cat_conditions, tag
 
 
 
+
+def _coerce_float(value, default: float) -> float:
+    """Parse Dash numeric input robustly, including comma decimal locales."""
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        value = value.strip().replace(",", ".")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_int(value, default: int) -> int:
+    try:
+        return int(float(str(value).strip().replace(",", ".")))
+    except (TypeError, ValueError):
+        return default
 
 def _parse_numeric_value(value, fallback=None):
     """Parse Dash numeric values robustly, including comma-decimal strings.
@@ -367,8 +359,8 @@ def _add_cont_trace(fig, cont_axis_idx, name, ids, x, y, vals, cmin, cmax, color
 def _covered(df, x_col, y_col):
     if not x_col or not y_col or x_col not in df.columns or y_col not in df.columns:
         return pd.Series(False, index=df.index)
-    x = numeric_col(x_col).loc[df.index]
-    y = numeric_col(y_col).loc[df.index]
+    x = pd.to_numeric(df[x_col], errors="coerce")
+    y = pd.to_numeric(df[y_col], errors="coerce")
     return x.notna() & y.notna()
 
 
@@ -394,161 +386,35 @@ def _add_working_filter(fig, plot_df, df, color_mode, fixed_color, cont_col, col
         return cont_axis_idx
     if color_mode == "fixed":
         fig.add_trace(go.Scattergl(
-            x=numeric_col(x_col).loc[plot_df.index], y=numeric_col(y_col).loc[plot_df.index], mode="markers",
+            x=pd.to_numeric(plot_df[x_col], errors="coerce"), y=pd.to_numeric(plot_df[y_col], errors="coerce"), mode="markers",
             marker=dict(size=point_size, color=fixed_color, symbol=symbol, opacity=alpha, line=dict(width=0.5, color="black")),
-            name="Working filter", customdata=id_str().loc[plot_df.index].tolist(), hovertemplate="<b>%{customdata}</b><extra></extra>",
+            name="Working filter", customdata=plot_df[id_col].astype(str).tolist(), hovertemplate="<b>%{customdata}</b><extra></extra>",
         ))
     elif color_mode == "continuous" and cont_col and cont_col in plot_df.columns:
-        vals = numeric_col(cont_col).loc[plot_df.index]
+        vals = pd.to_numeric(plot_df[cont_col], errors="coerce")
         has_val = vals.notna()
         no_val = plot_df[~has_val]
         color_df = plot_df[has_val]
         if not no_val.empty:
             fig.add_trace(go.Scattergl(
-                x=numeric_col(x_col).loc[no_val.index], y=numeric_col(y_col).loc[no_val.index], mode="markers",
+                x=pd.to_numeric(no_val[x_col], errors="coerce"), y=pd.to_numeric(no_val[y_col], errors="coerce"), mode="markers",
                 marker=dict(size=point_size, color="lightgrey", symbol=symbol, opacity=alpha, line=dict(width=0.5, color="#aaa")),
-                name="Working filter — no value", customdata=id_str().loc[no_val.index].tolist(), hovertemplate="<b>%{customdata}</b><br>No value<extra></extra>",
+                name="Working filter — no value", customdata=no_val[id_col].astype(str).tolist(), hovertemplate="<b>%{customdata}</b><br>No value<extra></extra>",
             ))
         if color_df.empty:
             return cont_axis_idx
         v = vals[has_val]
         if color_range_mode == "global":
-            full = numeric_col(cont_col).dropna()
+            full = pd.to_numeric(df[cont_col], errors="coerce").dropna()
             cmin, cmax = (float(full.min()), float(full.max())) if not full.empty else (0.0, 1.0)
         else:
             cmin, cmax = (float(v.min()), float(v.max())) if not v.empty else (0.0, 1.0)
         cont_axis_idx += 1
-        _add_cont_trace(fig, cont_axis_idx, f"Working filter — {cont_col}", id_str().loc[color_df.index].tolist(), numeric_col(x_col).loc[color_df.index].tolist(), numeric_col(y_col).loc[color_df.index].tolist(), v.tolist(), cmin, cmax, colormap, reversed_, point_size, alpha, symbol)
+        _add_cont_trace(fig, cont_axis_idx, f"Working filter — {cont_col}", color_df[id_col].astype(str).tolist(), pd.to_numeric(color_df[x_col], errors="coerce").tolist(), pd.to_numeric(color_df[y_col], errors="coerce").tolist(), v.tolist(), cmin, cmax, colormap, reversed_, point_size, alpha, symbol)
     return cont_axis_idx
 
 
-# Qualitative palette for cluster-region fills. Plotly's Dark24: 24 colours all
-# at similar saturation, so no cluster reads far brighter/paler than another
-# (D3 category20, used previously, pairs each hue with a washed-out tint).
-REGION_PALETTE = ["#2E91E5", "#E15F99", "#1CA71C", "#FB0D0D", "#DA16FF",
-                  "#B68100", "#750D86", "#EB663B", "#511CFB", "#00A08B",
-                  "#FB00D1", "#FC0080", "#B2828D", "#6C7C32", "#778AAE",
-                  "#862A16", "#A777F1", "#620042", "#1616A7", "#DA60CA",
-                  "#6C4516", "#0D2A63", "#AF0038", "#222A2A"]
-
-# Region rings are expensive (KDE ~0.5-1s); cache them so only a change to the
-# column / shape / extent / axes recomputes, not every unrelated slider tick.
-# reload_state() clears this when the datafile is reloaded.
-_REGION_CACHE = {}
-
-
-def _hex_to_rgba(hex_color, alpha):
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"rgba({r},{g},{b},{alpha})"
-
-
-# Category labels that are not real clusters (blank cells, HDBSCAN noise).
-_NOISE_LABELS = ("", "noise", "nan", "NaN", "<NA>")
-NOISE_COLOR = "#b0b0b0"
-
-
-def _cluster_color_map(region_col):
-    """Stable {category: colour} for a cluster column (noise excluded).
-
-    Built from every category in the column (not just the visible/filtered ones)
-    so a cluster keeps the same colour across the KDE, hull, and colour-points
-    modes and regardless of filtering.
-    """
-    vals = _ann_df[region_col].astype(str)
-    cats = sorted(c for c in vals.unique() if c not in _NOISE_LABELS)
-    return {c: REGION_PALETTE[i % len(REGION_PALETTE)] for i, c in enumerate(cats)}
-
-
-def _region_rings_for(region_col, shape, coverage, tightness, x_col, y_col):
-    """(cat, color, rings) per cluster in the current axes, memoized."""
-    key = (region_col, shape, round(coverage, 3), round(tightness, 3), x_col, y_col)
-    if key in _REGION_CACHE:
-        return _REGION_CACHE[key]
-    from sse_tools.cluster_regions import cluster_region_rings
-
-    df = _ann_df
-    covered = _covered(df, x_col, y_col)
-    vals = df[region_col].astype(str)
-    cmap = _cluster_color_map(region_col)
-    cats = [c for c in sorted(vals[covered].unique()) if c not in _NOISE_LABELS]
-    xs_all, ys_all = numeric_col(x_col), numeric_col(y_col)
-    out = []
-    for cat in cats:
-        idx = df.index[covered & (vals == cat)]
-        pts = np.column_stack([xs_all.loc[idx].to_numpy(float),
-                               ys_all.loc[idx].to_numpy(float)])
-        pts = pts[~np.isnan(pts).any(axis=1)]
-        if len(pts) < 3:
-            continue
-        rings = cluster_region_rings(pts, shape, tightness=tightness, coverage=coverage)
-        if rings:
-            out.append((cat, cmap.get(cat, REGION_PALETTE[0]), rings))
-    _REGION_CACHE[key] = out
-    return out
-
-
-def _add_cluster_regions(fig, region_col, shape, opacity, coverage, tightness, x_col, y_col):
-    if not region_col or region_col not in _ann_df.columns:
-        return
-    for cat, color, rings in _region_rings_for(region_col, shape, coverage,
-                                               tightness, x_col, y_col):
-        fillrgba = _hex_to_rgba(color, opacity)
-        # Scattergl (not Scatter) so regions share the WebGL layer with the
-        # points; Plotly draws all WebGL above all SVG, so an SVG fill could
-        # never sit on top of the gl markers. One trace per ring (grouped so a
-        # cluster is a single legend entry) avoids None-separated fill artefacts.
-        for j, r in enumerate(rings):
-            fig.add_trace(go.Scattergl(
-                x=r[:, 0].tolist(), y=r[:, 1].tolist(),
-                mode="lines", fill="toself", fillcolor=fillrgba,
-                line=dict(color=color, width=1.2), name=f"▣ {cat}",
-                legendgroup=f"region-{cat}", showlegend=(j == 0),
-                hoverinfo="skip",
-            ))
-
-
-def _add_cluster_points(fig, plot_df, point_size, alpha, symbol, region_col, x_col, y_col):
-    """Colour the (filtered) covered points by cluster, replacing the working
-    filter. Noise / unlabelled points render grey and beneath the clusters, with
-    the same palette the region overlays use so switching modes stays legible.
-
-    Draw order is bottom-up: noise, then clusters largest to smallest, so a small
-    cluster is never buried under a big one it overlaps.
-    """
-    if not region_col or region_col not in plot_df.columns:
-        return
-    sub = plot_df[_covered(plot_df, x_col, y_col)]
-    if sub.empty:
-        return
-    cmap = _cluster_color_map(region_col)
-    vals = sub[region_col].astype(str)
-    counts = vals.value_counts()
-    xs, ys = numeric_col(x_col), numeric_col(y_col)
-    # Plotly stacks traces in the order they are added: noise first (bottom),
-    # then clusters largest to smallest, so a small cluster is never buried
-    # under a big one it overlaps.
-    cats = sorted(vals.unique(), key=lambda c: (c in cmap, -int(counts[c]), c))
-    # legendrank keeps the legend readable (clusters by name, noise last)
-    # independently of that draw order.
-    ranks = {c: 1001 + i for i, c in enumerate(sorted(cmap))}
-    for cat in cats:
-        idx = sub.index[vals == cat]
-        in_map = cat in cmap
-        fig.add_trace(go.Scattergl(
-            x=xs.loc[idx].tolist(), y=ys.loc[idx].tolist(), mode="markers",
-            marker=dict(size=point_size, color=cmap[cat] if in_map else NOISE_COLOR,
-                        symbol=symbol, opacity=alpha,
-                        line=dict(width=0.3, color="rgba(0,0,0,0.35)")),
-            name=f"■ {cat}" if in_map else "■ noise",
-            legendgroup=f"cpoint-{cat}", showlegend=True,
-            legendrank=ranks.get(cat, 1001 + len(ranks)),
-            customdata=id_str().loc[idx].tolist(),
-            hovertemplate="<b>%{customdata}</b><extra></extra>",
-        ))
-
-
-def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_color, cont_col, colormap, reversed_, color_range_mode, alpha, point_size, bg_size, marker_size, marker_alpha, marker_mode, wf_position, wf_visible, layers, id_search_ids=None, wf_symbol=DEFAULT_SYMBOL, selection_ids=None, selection_color=DEFAULT_SELECTION_COLOR, region_col=None, region_shape="kde", region_position="below", region_opacity=0.25, region_coverage=0.4, region_tightness=0.25):
+def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_color, cont_col, colormap, reversed_, color_range_mode, alpha, point_size, bg_size, marker_size, marker_alpha, marker_mode, wf_position, wf_visible, layers, id_search_ids=None, wf_symbol=DEFAULT_SYMBOL, selection_ids=None, selection_color=DEFAULT_SELECTION_COLOR):
     df = _ann_df
     x_col, y_col = _x_col, _y_col
     if df.empty:
@@ -559,11 +425,6 @@ def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_
         return fig, 0, 0
 
     fig = go.Figure()
-    has_region_col = bool(region_col) and region_col in df.columns
-    draw_regions = has_region_col and region_shape in ("kde", "hull")
-    color_points_mode = has_region_col and region_shape == "points"
-    if draw_regions and region_position == "below":
-        _add_cluster_regions(fig, region_col, region_shape, region_opacity, region_coverage, region_tightness, x_col, y_col)
     coord_mask = _covered(df, x_col, y_col)
     filter_mask = apply_filters(df, cont_conds, bool_conds, cat_conds, tag_conds, id_search_ids)
     plot_df = df[filter_mask]
@@ -571,17 +432,9 @@ def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_
     n_covered_filtered = int((filter_mask & coord_mask).sum())
 
     query_mask = boolean_mask(df[COL_QUERY]).fillna(False) if COL_QUERY in df.columns else pd.Series(False, index=df.index)
-    # When the working filter is active, keep only its excluded points in the
-    # subdued background trace.  Drawing every point here and relying on the
-    # coloured trace to cover matches is unreliable (notably with transparent
-    # markers and WebGL rendering) and makes filtered-in points look grey too.
-    working_filter_active = bool(cont_conds or bool_conds or cat_conds or tag_conds or id_search_ids)
-    bg_mask = coord_mask & ~query_mask
-    if working_filter_active and wf_visible:
-        bg_mask &= ~filter_mask
-    bg_df = df[bg_mask]
+    bg_df = df[coord_mask & ~query_mask]
     fig.add_trace(go.Scattergl(
-        x=numeric_col(x_col).loc[bg_df.index], y=numeric_col(y_col).loc[bg_df.index], mode="markers",
+        x=pd.to_numeric(bg_df[x_col], errors="coerce"), y=pd.to_numeric(bg_df[y_col], errors="coerce"), mode="markers",
         marker=dict(size=bg_size, color="lightgrey", opacity=0.4), name="All sequences", hoverinfo="skip", showlegend=True,
     ))
     if marker_mode == "bottom":
@@ -589,16 +442,13 @@ def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_
 
     cont_axis_idx = 0
     if wf_visible and wf_position == "bottom":
-        if color_points_mode:
-            _add_cluster_points(fig, plot_df, point_size, alpha, wf_symbol, region_col, x_col, y_col)
-        else:
-            cont_axis_idx = _add_working_filter(fig, plot_df, df, color_mode, fixed_color, cont_col, colormap, reversed_, color_range_mode, alpha, point_size, cont_axis_idx, _id_col, x_col, y_col, wf_symbol)
+        cont_axis_idx = _add_working_filter(fig, plot_df, df, color_mode, fixed_color, cont_col, colormap, reversed_, color_range_mode, alpha, point_size, cont_axis_idx, _id_col, x_col, y_col, wf_symbol)
 
     for layer in reversed([l for l in (layers or []) if l.get("visible", True)]):
         ids = set(str(x) for x in layer.get("ids", []))
         if not ids:
             continue
-        sub = df[id_str().isin(ids)]
+        sub = df[df[_id_col].astype(str).isin(ids)]
         sub = sub[_covered(sub, x_col, y_col)]
         if sub.empty:
             continue
@@ -608,48 +458,38 @@ def make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_
         l_symbol = style.get("marker_symbol", DEFAULT_SYMBOL)
         if style.get("color_mode") == "continuous" and style.get("cont_col") in sub.columns:
             ccol = style.get("cont_col")
-            vals = numeric_col(ccol).loc[sub.index]
+            vals = pd.to_numeric(sub[ccol], errors="coerce")
             has_val = vals.notna()
             if has_val.any():
                 v = vals[has_val]
-                hv_idx = v.index
                 cont_axis_idx += 1
-                if style.get("color_range") == "global":
-                    full = numeric_col(ccol).dropna()
-                    cmin, cmax = float(full.min()), float(full.max())
-                else:
-                    cmin, cmax = float(v.min()), float(v.max())
-                _add_cont_trace(fig, cont_axis_idx, layer.get("name", "Layer"), id_str().loc[hv_idx].tolist(), numeric_col(x_col).loc[hv_idx].tolist(), numeric_col(y_col).loc[hv_idx].tolist(), v.tolist(), cmin, cmax, style.get("colormap", DEFAULT_COLORMAP), style.get("reversed", False), l_size, l_alpha, l_symbol)
+                cmin, cmax = (float(v.min()), float(v.max())) if style.get("color_range") != "global" else (
+                    float(pd.to_numeric(df[ccol], errors="coerce").dropna().min()),
+                    float(pd.to_numeric(df[ccol], errors="coerce").dropna().max()),
+                )
+                _add_cont_trace(fig, cont_axis_idx, layer.get("name", "Layer"), sub.loc[has_val, _id_col].astype(str).tolist(), pd.to_numeric(sub.loc[has_val, x_col], errors="coerce").tolist(), pd.to_numeric(sub.loc[has_val, y_col], errors="coerce").tolist(), v.tolist(), cmin, cmax, style.get("colormap", DEFAULT_COLORMAP), style.get("reversed", False), l_size, l_alpha, l_symbol)
         else:
             fig.add_trace(go.Scattergl(
-                x=numeric_col(x_col).loc[sub.index], y=numeric_col(y_col).loc[sub.index], mode="markers",
+                x=pd.to_numeric(sub[x_col], errors="coerce"), y=pd.to_numeric(sub[y_col], errors="coerce"), mode="markers",
                 marker=dict(size=l_size, color=style.get("fixed_color", DEFAULT_FIXED_COLOR), symbol=l_symbol, opacity=l_alpha, line=dict(width=0.5, color="black")),
-                name=layer.get("name", "Layer"), customdata=id_str().loc[sub.index].tolist(), hovertemplate="<b>%{customdata}</b><extra></extra>",
+                name=layer.get("name", "Layer"), customdata=sub[_id_col].astype(str).tolist(), hovertemplate="<b>%{customdata}</b><extra></extra>",
             ))
 
     if wf_visible and wf_position == "top":
-        if color_points_mode:
-            _add_cluster_points(fig, plot_df, point_size, alpha, wf_symbol, region_col, x_col, y_col)
-        else:
-            cont_axis_idx = _add_working_filter(fig, plot_df, df, color_mode, fixed_color, cont_col, colormap, reversed_, color_range_mode, alpha, point_size, cont_axis_idx, _id_col, x_col, y_col, wf_symbol)
-    # "Above" is added after the working-filter trace (the actual data points),
-    # not just the grey background, so it sits over every point cloud. Query
-    # markers and the selection highlight are drawn next, staying on top.
-    if draw_regions and region_position == "above":
-        _add_cluster_regions(fig, region_col, region_shape, region_opacity, region_coverage, region_tightness, x_col, y_col)
+        cont_axis_idx = _add_working_filter(fig, plot_df, df, color_mode, fixed_color, cont_col, colormap, reversed_, color_range_mode, alpha, point_size, cont_axis_idx, _id_col, x_col, y_col, wf_symbol)
     if marker_mode == "top":
         _add_query_traces(fig, df, _id_col, x_col, y_col, marker_size, marker_alpha)
     if selection_ids:
-        sel_df = df[id_str().isin([str(x) for x in selection_ids])]
+        sel_df = df[df[_id_col].astype(str).isin([str(x) for x in selection_ids])]
         sel_df = sel_df[_covered(sel_df, x_col, y_col)]
         if not sel_df.empty:
             fig.add_trace(go.Scattergl(
-                x=numeric_col(x_col).loc[sel_df.index], y=numeric_col(y_col).loc[sel_df.index], mode="markers",
+                x=pd.to_numeric(sel_df[x_col], errors="coerce"), y=pd.to_numeric(sel_df[y_col], errors="coerce"), mode="markers",
                 marker=dict(size=point_size + 6, symbol="circle-open", color=selection_color, opacity=1.0, line=dict(width=2.5, color=selection_color)),
-                name=f"Selected ({len(sel_df)})", customdata=id_str().loc[sel_df.index].tolist(), hovertemplate="<b>%{customdata}</b><br>Selected<extra></extra>",
+                name=f"Selected ({len(sel_df)})", customdata=sel_df[_id_col].astype(str).tolist(), hovertemplate="<b>%{customdata}</b><br>Selected<extra></extra>",
             ))
     fig.update_layout(
-        xaxis=dict(title=x_col, showgrid=False),
+        xaxis=dict(title=x_col, constrain="domain", showgrid=False),
         yaxis=dict(title=y_col, scaleanchor="x", scaleratio=1, showgrid=False),
         template="simple_white", dragmode="pan", uirevision="sequence-space",
         legend=dict(itemsizing="constant", yanchor="bottom", y=0.01, xanchor="right", x=0.99),
@@ -665,41 +505,14 @@ def make_details_panel(sequence_id: str):
     if row.empty:
         return html.Div(f"No metadata found for {sequence_id}.")
     row = row.iloc[0]
-    groups = {"Identity": [], "Taxonomy": [], "Scores & annotations": [], "Sequence": []}
+    rows = [html.Tr([html.Td("ID", style={"fontWeight": "bold", "padding": "4px 10px"}), html.Td(sequence_id, style={"padding": "4px 10px"})])]
     for col in _ann_df.columns:
         if col == _id_col or _types.get(col) == TYPE_COORDINATE:
             continue
         val = row.get(col, "")
         val = "" if pd.isna(val) else str(val)
-        if not val.strip():
-            continue
-        key = col.lower()
-        if col == COL_SEQ or "sequence" in key:
-            group = "Sequence"
-        elif any(x in key for x in ("tax", "organism", "species", "genus", "family", "phylum", "kingdom")):
-            group = "Taxonomy"
-        elif any(x in key for x in ("name", "label", "accession", "description")):
-            group = "Identity"
-        else:
-            group = "Scores & annotations"
-        display_val = val
-        value_class = "detail-value detail-sequence" if group == "Sequence" else "detail-value"
-        groups[group].append(html.Div([
-            html.Div(col.replace("_", " "), className="detail-key", title=col),
-            html.Div(display_val, className=value_class, title=display_val),
-        ], className="detail-row"))
-
-    sections = [
-        html.Section([html.H5(name), html.Div(items, className="detail-grid")], className="detail-section")
-        for name, items in groups.items() if items
-    ]
-    return html.Div([
-        html.Div([
-            html.Div([html.Div("Sequence inspector", className="detail-eyebrow"), html.H3(sequence_id, title=sequence_id)]),
-            html.Span("Selected", className="status-pill"),
-        ], className="detail-header"),
-        *sections,
-    ], className="details-panel")
+        rows.append(html.Tr([html.Td(col, style={"fontWeight": "bold", "padding": "4px 10px", "verticalAlign": "top"}), html.Td(val, style={"padding": "4px 10px", "wordBreak": "break-all"})]))
+    return html.Div([html.H4(f"Selected: {sequence_id}", style={"marginBottom": "10px"}), html.Table(rows, style={"borderCollapse": "collapse", "width": "100%", "fontSize": "13px"})])
 
 
 def make_filter_panel():
@@ -766,21 +579,61 @@ def make_sidebar(layers):
         n_total = len(layer.get("ids", []))
         n_cov = n_total
         if _x_col and _y_col and not _ann_df.empty:
-            sub = _ann_df[id_str().isin([str(x) for x in layer.get("ids", [])])]
+            sub = _ann_df[_ann_df[_id_col].astype(str).isin([str(x) for x in layer.get("ids", [])])]
             n_cov = int(_covered(sub, _x_col, _y_col).sum())
-        rows.append(html.Div([swatch, html.Div([html.Div(layer.get("name", "Layer"), title=layer.get("name", "Layer"), style={"fontSize": "11px", "fontWeight": "500", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"}), html.Div(f"{n_cov:,}/{n_total:,} visible here", style={"fontSize": "10px", "color": "var(--text-faint)"})], style={"flexGrow": "1", "minWidth": "0", "margin": "0 4px"}), html.Button(html.Span(className="ic ic-up"), id={"type": "layer-up", "lid": lid}, disabled=i == 0, title="Move up", className="sse-icon-btn", style=btn), html.Button(html.Span(className="ic ic-down"), id={"type": "layer-down", "lid": lid}, disabled=i == n - 1, title="Move down", className="sse-icon-btn", style=btn), html.Button(html.Span(className="ic ic-load"), id={"type": "layer-load", "lid": lid}, title="Load into working filter", className="sse-icon-btn", style={**btn, "color": "var(--accent)"}), html.Button(html.Span(className="ic ic-eye" if visible else "ic ic-eyeoff"), id={"type": "layer-toggle", "lid": lid}, title="Show/hide layer", className="sse-icon-btn", style={**btn, "opacity": "1" if visible else "0.5"}), html.Button(html.Span(className="ic ic-x"), id={"type": "layer-delete", "lid": lid}, title="Delete layer", className="sse-icon-btn", style={**btn, "color": "var(--danger)"})], style={"display": "flex", "alignItems": "center", "padding": "5px 2px", "borderBottom": "1px solid var(--border-soft)", "opacity": "1" if visible else "0.5"}))
+        rows.append(html.Div([swatch, html.Div([html.Div(layer.get("name", "Layer"), title=layer.get("name", "Layer"), style={"fontSize": "11px", "fontWeight": "500", "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap"}), html.Div(f"{n_cov:,}/{n_total:,} visible here", style={"fontSize": "10px", "color": "var(--text-faint)"})], style={"flexGrow": "1", "minWidth": "0", "margin": "0 4px"}), html.Button("↑", id={"type": "layer-up", "lid": lid}, disabled=i == 0, style=btn), html.Button("↓", id={"type": "layer-down", "lid": lid}, disabled=i == n - 1, style=btn), html.Button("⤴", id={"type": "layer-load", "lid": lid}, title="Load into working filter", style={**btn, "color": "var(--accent)"}), html.Button("👁" if visible else "🚫", id={"type": "layer-toggle", "lid": lid}, style={**btn, "opacity": "1" if visible else "0.4"}), html.Button("✕", id={"type": "layer-delete", "lid": lid}, style={**btn, "color": "var(--danger)"})], style={"display": "flex", "alignItems": "center", "padding": "5px 2px", "borderBottom": "1px solid var(--border-soft)", "opacity": "1" if visible else "0.5"}))
     return html.Div(rows, style={"maxHeight": "400px", "overflowY": "auto"})
 
 
+def current_job_records():
+    data = job_store.read_jobs(ENTRY.jobs_path, mark_stale=False)
+    return data.get("boltz", {}), data.get("rmsd", {})
+
+
+def make_job_table(jobs: dict):
+    if not jobs:
+        return html.Div("No Boltz jobs yet.", style={"fontSize": "11px", "color": "var(--text-faint)"})
+    rows = []
+    colors = {"queued":"var(--text-muted)", "msa":"var(--accent)", "predicting":"var(--warning)", "done":"var(--success)", "cached":"var(--success)", "error":"var(--danger)", "interrupted":"var(--warning)"}
+    for job in sorted(jobs.values(), key=lambda j: j.get("updated_utc", ""), reverse=True):
+        status = job.get("status", "")
+        sid = job.get("sequence_id", "")
+        kind = job.get("kind", "apo")
+        typ = "apo" if kind == "apo" else f"holo · {job.get('smiles_label') or job.get('smiles_hash', '')}"
+        rows.append(html.Tr([html.Td(sid[:16] + ("…" if len(sid) > 16 else ""), title=sid, style={"fontFamily": "monospace", "fontSize": "10px", "padding": "3px 5px"}), html.Td(typ, title=typ, style={"fontSize": "9px", "padding": "3px 5px"}), html.Td(status, style={"fontSize": "10px", "fontWeight": "600", "color": colors.get(status, "var(--text-muted)"), "padding": "3px 5px"}), html.Td(f"{job.get('ptm'):.3f}" if isinstance(job.get("ptm"), (int, float)) else "—", style={"fontFamily": "monospace", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(f"{job.get('plddt'):.1f}" if isinstance(job.get("plddt"), (int, float)) else "—", style={"fontFamily": "monospace", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"})], style={"borderBottom": "1px solid var(--border-soft)"}))
+    th = {"padding": "3px 5px", "fontSize": "10px", "color": "var(--text-muted)", "fontWeight": "600", "textAlign": "left"}
+    return html.Table([html.Thead(html.Tr([html.Th("ID", style=th), html.Th("Type", style=th), html.Th("Status", style=th), html.Th("pTM", style={**th, "textAlign": "right"}), html.Th("pLDDT", style={**th, "textAlign": "right"})])), html.Tbody(rows)], style={"width": "100%", "borderCollapse": "collapse"})
+
+
+def boltz_summary(jobs: dict) -> str:
+    if not jobs:
+        return ""
+    counts = {}
+    for j in jobs.values():
+        counts[j.get("status", "unknown")] = counts.get(j.get("status", "unknown"), 0) + 1
+    order = ["done", "cached", "predicting", "msa", "queued", "interrupted", "error"]
+    return " · ".join(f"{counts[k]} {k}" for k in order if k in counts)
+
+
+def make_rmsd_results_table(results: list[dict]):
+    if not results:
+        return html.Div()
+    results = sorted(results, key=lambda r: (r.get("method", ""), np.isnan(r.get("rmsd", np.nan)) if isinstance(r.get("rmsd"), float) else False, r.get("rmsd") if isinstance(r.get("rmsd"), (int, float)) and not np.isnan(r.get("rmsd")) else 9999))
+    rows = []
+    for r in results:
+        rmsd = r.get("rmsd")
+        rmsd_s = f"{rmsd:.3f}" if isinstance(rmsd, (int, float)) and not np.isnan(rmsd) else "—"
+        rows.append(html.Tr([html.Td(r.get("query_id", ""), style={"fontFamily": "monospace", "fontSize": "10px", "padding": "3px 5px"}), html.Td(str(r.get("query_rank", 0)), style={"fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(str(r.get("n_aligned", "")), style={"fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(rmsd_s, style={"fontFamily": "monospace", "fontWeight": "600", "fontSize": "10px", "textAlign": "right", "padding": "3px 5px"}), html.Td(r.get("method", ""), style={"fontSize": "9px", "padding": "3px 5px"}), html.Td("✓ cached" if r.get("cached") else "", style={"fontSize": "9px", "color": "var(--success)", "padding": "3px 5px"})], style={"borderBottom": "1px solid var(--border-soft)"}))
+    th = {"padding": "3px 5px", "fontSize": "10px", "color": "var(--text-muted)", "fontWeight": "600", "textAlign": "left"}
+    return html.Table([html.Thead(html.Tr([html.Th("Query", style=th), html.Th("Rank", style={**th, "textAlign": "right"}), html.Th("Aligned", style={**th, "textAlign": "right"}), html.Th("RMSD Å", style={**th, "textAlign": "right"}), html.Th("Method", style=th), html.Th("", style=th)])), html.Tbody(rows)], style={"width": "100%", "borderCollapse": "collapse"})
+
+
 SSE_INDEX_STRING = """<!DOCTYPE html>
-<html lang="en" data-theme="pipeline">
+<html>
 <head>
 {%metas%}
 <title>{%title%}</title>
 {%favicon%}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 {%css%}
 <style>
 :root,
@@ -884,40 +737,8 @@ html[data-theme="deep-canopy"] {
   color-scheme: dark;
 }
 
-/* Pipeline — mirrors the Pipeline Control Center app (deep-teal glass, Geist,
-   amber/lime accents). Palette lifted 1:1 from pipeline-ui-poc/app/globals.css
-   (--ink/--muted/--teal/--lime/--amber/--red); surfaces are the solid form of
-   that app's panel gradient, borders are its teal hairlines. The ambient shell,
-   panel gradients and teal-gradient buttons live in the polish block below. */
-html[data-theme="pipeline"] {
-  --page:        #101615;   /* --canvas (near-black teal behind the shell) */
-  --surface:     #06333c;   /* solid of the panel gradient rgba(5,47,56,.83) */
-  --surface-2:   #0a4650;   /* lighter teal inset */
-  --border:      rgba(96,205,195,.20);   /* --line-strong hairline */
-  --border-soft: rgba(96,205,195,.10);   /* --line */
-  --text:        #edf8f4;   /* --ink */
-  --text-muted:  #9dbeba;   /* --muted, lifted a touch for dcc cells */
-  --text-faint:  #6f9691;   /* --faint */
-
-  --accent:      #0eb5a4;   /* --teal */
-  --accent-weak: rgba(14,181,164,.16);
-  --on-accent:   #ecfffa;
-
-  --lime:        #b8e94f;   /* --lime (the signature Pipeline pop accent) */
-  --success:     #b8e94f;   /* positive == lime, as in the Pipeline app */
-  --warning:     #e6bf56;   /* --amber */
-  --danger:      #ff8a8a;   /* --red */
-  --boltz:       #a78bfa;   /* violet, stays distinct on teal */
-
-  /* Near-flat: only a faint inner highlight, so panels read like the Pipeline
-     app's cards (flush) rather than floating on a drop shadow. */
-  --shadow-card: inset 0 1px rgba(255,255,255,.02);
-  color-scheme: dark;
-}
-
 /* page + default text follow the theme (covers gutters too) */
 html, body { background: var(--page); color: var(--text); }
-html, body { margin:0; min-height:100%; }
 .sse-root  { color: var(--text);
   font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 
@@ -1014,304 +835,7 @@ html, body { margin:0; min-height:100%; }
 .sse-root .dash-slider-mark,
 .sse-root .dash-slider-mark-outside-selection { color: var(--text-muted) !important; background: transparent !important; }
 
-/* =========================================================================
-   Redesign layer (2026-07): additive polish only — no callback changes.
-   Inline mask-image icons (colour follows currentColor), card/summary polish,
-   a consistent button hierarchy via :hover (filter/!important beat inline base
-   styles without touching them), a plot "hero" card, and collapsible rails.
-   ------------------------------------------------------------------------- */
-:root {
-  --i-chev:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E");
-  --i-up:    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M6 11l6-6 6 6'/%3E%3C/svg%3E");
-  --i-down:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M6 13l6 6 6-6'/%3E%3C/svg%3E");
-  --i-load:  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h12M12 8l4 4-4 4'/%3E%3C/svg%3E");
-  --i-eye:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z'/%3E%3Ccircle cx='12' cy='12' r='2.6'/%3E%3C/svg%3E");
-  --i-eyeoff:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4l16 16M9.9 5.2A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a15 15 0 0 1-3.4 4M6.1 7.9A15 15 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 3.2-.5'/%3E%3C/svg%3E");
-  --i-x:     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
-}
-.sse-root .ic { display:inline-block; width:14px; height:14px; flex:none;
-  background-color: currentColor; vertical-align:-2px;
-  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
-  -webkit-mask-position:center; mask-position:center;
-  -webkit-mask-size:contain; mask-size:contain; }
-.sse-root .ic-up{ -webkit-mask-image:var(--i-up); mask-image:var(--i-up); }
-.sse-root .ic-down{ -webkit-mask-image:var(--i-down); mask-image:var(--i-down); }
-.sse-root .ic-load{ -webkit-mask-image:var(--i-load); mask-image:var(--i-load); }
-.sse-root .ic-eye{ -webkit-mask-image:var(--i-eye); mask-image:var(--i-eye); }
-.sse-root .ic-eyeoff{ -webkit-mask-image:var(--i-eyeoff); mask-image:var(--i-eyeoff); }
-.sse-root .ic-x{ -webkit-mask-image:var(--i-x); mask-image:var(--i-x); }
-
-/* Top-level panels: chevron affordance + hover, marker removed */
-.sse-root .sse-col > details > summary { list-style:none; display:flex; align-items:center; gap:7px; }
-.sse-root .sse-col > details > summary::-webkit-details-marker { display:none; }
-.sse-root .sse-col > details > summary::before {
-  content:""; width:13px; height:13px; flex:none; color:var(--text-faint);
-  background-color: currentColor;
-  -webkit-mask:var(--i-chev) center/contain no-repeat; mask:var(--i-chev) center/contain no-repeat;
-  transform: rotate(0deg); transition: transform .18s ease; }
-.sse-root .sse-col > details[open] > summary::before { transform: rotate(90deg); }
-.sse-root .sse-col > details > summary:hover { color: var(--accent); }
-.sse-root .sse-col > details { transition: border-color .15s ease, box-shadow .15s ease; }
-.sse-root .sse-col > details:hover { border-color: var(--accent); }
-
-/* Button hierarchy — hover states layered on top of existing inline styles */
-.sse-root button { transition: filter .12s ease, background-color .12s ease, border-color .12s ease; }
-.sse-root .sse-btn-primary:hover { filter: brightness(1.07); }
-.sse-root .sse-btn-primary:active { filter: brightness(.95); }
-.sse-root .sse-btn-sec:hover { background: var(--surface-2) !important; border-color: var(--accent) !important; }
-.sse-root .sse-icon-btn:hover { background: var(--surface-2) !important; color: var(--accent) !important; }
-.sse-root .sse-icon-btn { border-radius:6px; }
-
-/* Coordinate field labels sat flush against each other ("Coordinate systemX axis") */
-.sse-root #coord-system-panel > label, .sse-root #coord-free-panel > label {
-  display:block; margin:9px 0 3px; }
-
-/* Plot as hero: rounded card around the graph */
-.sse-root .sse-plot-card { background: var(--surface); border:1px solid var(--border);
-  border-radius:12px; box-shadow: var(--shadow-card); padding:8px 8px 4px; }
-.sse-root .sse-plot-card .js-plotly-plot .plot-container { border-radius:8px; }
-/* Plotly modebar: follow the theme instead of fixed dark-on-dark icons */
-.sse-root .sse-plot-card .modebar { background: transparent !important; }
-.sse-root .sse-plot-card .modebar-btn .icon path { fill: var(--text-faint) !important; }
-.sse-root .sse-plot-card .modebar-btn.active .icon path,
-.sse-root .sse-plot-card .modebar-btn:hover .icon path { fill: var(--accent) !important; }
-
-/* Collapsible rails */
-.sse-root .sse-rail { transition: width .2s ease, min-width .2s ease, opacity .18s ease, padding .2s ease; }
-.sse-root .rail-toggle { background:none; border:none; cursor:pointer; color:var(--text-faint);
-  font-size:16px; line-height:1; padding:4px 7px; border-radius:6px; }
-.sse-root .rail-toggle:hover { background:var(--surface-2); color:var(--accent); }
-
-/* Workspace shell and typography */
-.sse-root { font-size:14px; }
-.sse-root .sse-header { position:sticky; top:0; z-index:20; padding:14px 0 12px;
-  background:color-mix(in srgb, var(--page) 92%, transparent); backdrop-filter:blur(12px); }
-.sse-root .sse-header h2 { font-size:24px; letter-spacing:-.025em; }
-.sse-root .sse-workspace { min-height:calc(100vh - 104px); }
-.sse-root .sse-rail { position:sticky; top:88px; max-height:calc(100vh - 104px) !important;
-  scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
-.sse-root .sse-center { padding-bottom:32px; }
-.sse-root .sse-toolbar { min-height:34px; }
-.sse-root .selection-toolbar { padding:8px 10px !important; border-radius:9px !important;
-  box-shadow:var(--shadow-card); }
-.sse-root .plot-status { font-variant-numeric:tabular-nums; }
-
-/* Details become a scannable inspector instead of an undifferentiated table. */
-.sse-root .details-card { padding:0 !important; overflow:hidden; }
-.sse-root .details-empty { padding:20px; color:var(--text-muted); text-align:center; }
-.sse-root .details-panel { padding:18px; }
-.sse-root .detail-header { display:flex; align-items:flex-start; justify-content:space-between;
-  gap:16px; padding-bottom:14px; border-bottom:1px solid var(--border); }
-.sse-root .detail-header h3 { margin:3px 0 0; font-size:18px; line-height:1.25;
-  overflow-wrap:anywhere; }
-.sse-root .detail-eyebrow { color:var(--text-muted); font-size:11px; font-weight:700;
-  letter-spacing:.08em; text-transform:uppercase; }
-.sse-root .status-pill { flex:none; padding:4px 9px; border-radius:999px;
-  color:var(--accent); background:var(--accent-weak); font-size:11px; font-weight:700; }
-.sse-root .detail-section { margin-top:16px; }
-.sse-root .detail-section h5 { margin:0 0 8px; color:var(--text-muted); font-size:11px;
-  letter-spacing:.07em; text-transform:uppercase; }
-.sse-root .detail-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:1px;
-  overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--border); }
-.sse-root .detail-row { min-width:0; padding:9px 11px; background:var(--surface); }
-.sse-root .detail-key { margin-bottom:3px; color:var(--text-muted); font-size:11px;
-  font-weight:600; text-transform:capitalize; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.sse-root .detail-value { line-height:1.4; overflow-wrap:anywhere; }
-.sse-root .detail-sequence { max-height:5.6em; overflow:auto; font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
-
-/* Larger targets and clearer control rhythm. */
-.sse-root button { min-height:30px; }
-.sse-root .sse-icon-btn, .sse-root .rail-toggle { min-width:30px; min-height:30px; }
-.sse-root .sse-col > details { border-radius:10px; padding:8px 12px 12px; }
-.sse-root .sse-col > details > summary { min-height:30px; font-size:13px; }
-
-@media (max-width: 1100px) {
-  .sse-root { padding:14px !important; }
-  .sse-root .sse-workspace { display:grid !important; grid-template-columns:minmax(240px, 280px) minmax(0, 1fr); }
-  .sse-root #right-rail { position:static; grid-column:1 / -1; width:auto !important; min-width:0 !important;
-    max-height:none !important; padding:18px 0 0 !important; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; }
-  .sse-root #right-rail > * { min-width:0; }
-  .sse-root .sse-center { padding-right:0 !important; }
-}
-
-@media (max-width: 760px) {
-  .sse-root .sse-header { position:static; align-items:flex-start !important; gap:12px; flex-direction:column; }
-  .sse-root .sse-header > div:last-child { width:100%; }
-  .sse-root .sse-header [class*="dash-dropdown"] { flex:1; }
-  .sse-root .sse-workspace { display:flex !important; flex-direction:column; }
-  .sse-root #left-rail, .sse-root #right-rail { position:static; width:100% !important; min-width:0 !important;
-    max-height:none !important; padding:0 !important; opacity:1 !important; overflow:visible !important; }
-  .sse-root #left-rail { order:2; margin-top:14px; }
-  .sse-root #right-rail { order:3; display:block; }
-  .sse-root .sse-center { order:1; padding:0 !important; }
-  .sse-root .rail-toggle { display:none; }
-  .sse-root .selection-toolbar { flex-wrap:wrap; gap:6px; }
-  .sse-root .selection-toolbar > span { flex-basis:100%; }
-  .sse-root .sse-plot-card { padding:4px; }
-  .sse-root #latent-graph { height:62vh !important; min-height:460px; }
-  .sse-root .detail-grid { grid-template-columns:1fr; }
-}
-
 @media (prefers-reduced-motion: reduce) { .sse-root * { transition: none !important; } }
-
-/* =========================================================================
-   Pipeline theme polish (data-theme="pipeline" only) — makes the visualizer
-   read like the Pipeline Control Center: an ambient rounded "app-shell" with a
-   perspective grid + teal glow, glassy panel gradients, teal-gradient primary
-   buttons, and the Geist typeface. Scoped to the theme so the other four are
-   untouched. Backgrounds use !important to beat the inline var(--surface) fills.
-   ------------------------------------------------------------------------- */
-html[data-theme="pipeline"] { font-synthesis-weight: none; }
-html[data-theme="pipeline"] body {
-  background:
-    radial-gradient(circle at 16% 6%, rgba(0,118,126,.13), transparent 34%),
-    radial-gradient(circle at 88% 26%, rgba(0,89,94,.11), transparent 30%),
-    var(--page);
-}
-
-/* Rounded, bordered, glowing shell around the whole workspace (~.app-shell). */
-html[data-theme="pipeline"] .sse-root {
-  position: relative;
-  isolation: isolate;
-  font-family: "Geist", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-  margin: 14px auto !important;
-  padding: 20px 26px 40px !important;
-  border: 1px solid rgba(91,207,197,.12);
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at 20% 4%, rgba(0,118,126,.15), transparent 33%),
-    radial-gradient(circle at 86% 32%, rgba(0,89,94,.13), transparent 29%),
-    linear-gradient(145deg, #001e27 0%, #002a32 48%, #001b24 100%);
-  box-shadow: 0 18px 65px rgba(0,0,0,.34);
-}
-/* Ambient perspective grid + glow, fixed to the viewport, behind the content
-   (z-index:-1 inside the isolated .sse-root stacking context). */
-html[data-theme="pipeline"] .sse-root::before {
-  content:""; position: fixed; z-index:-1; left:3%; bottom:-50px;
-  width:60%; height:56%; opacity:.5; pointer-events:none;
-  background-image:
-    linear-gradient(rgba(31,201,190,.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(31,201,190,.05) 1px, transparent 1px);
-  background-size:38px 38px;
-  transform: perspective(430px) rotateX(63deg) rotateZ(-9deg);
-  transform-origin:50% 100%;
-  -webkit-mask-image: linear-gradient(90deg,#000 0%,#000 56%,transparent 94%);
-  mask-image: linear-gradient(90deg,#000 0%,#000 56%,transparent 94%);
-}
-html[data-theme="pipeline"] .sse-root::after {
-  content:""; position: fixed; z-index:-1; left:8%; bottom:6%;
-  width:30%; height:26%; border-radius:50%; filter: blur(42px);
-  background: rgba(0,186,178,.13); pointer-events:none;
-}
-
-/* Header: teal-tinted glass strip + glowing title (~.entry-header h1). */
-html[data-theme="pipeline"] .sse-root .sse-header {
-  background: color-mix(in srgb, #01222b 88%, transparent);
-}
-html[data-theme="pipeline"] .sse-root .sse-header h2 {
-  color: #f3fbf8; letter-spacing: -.03em;
-  text-shadow: 0 1px 22px rgba(20,186,174,.12);
-}
-
-/* Panels as flat cards (~.panel) — near-uniform teal fill, thin hairline,
-   NO drop shadow, so they sit flush like the Pipeline app instead of floating. */
-html[data-theme="pipeline"] .sse-root .sse-col > details,
-html[data-theme="pipeline"] .sse-root .sse-plot-card,
-html[data-theme="pipeline"] .sse-root .details-card,
-html[data-theme="pipeline"] .sse-root .selection-toolbar {
-  background: linear-gradient(150deg, rgba(7,52,61,.5), rgba(5,44,52,.52)) !important;
-  border-color: rgba(96,205,195,.13) !important;
-  box-shadow: inset 0 1px rgba(255,255,255,.02) !important;
-  -webkit-backdrop-filter: none; backdrop-filter: none;
-}
-html[data-theme="pipeline"] .sse-root .sse-col > details:hover {
-  border-color: rgba(96,205,195,.28) !important;
-}
-/* Open panel gets a subtle lime spine, echoing the Pipeline app's active nav. */
-html[data-theme="pipeline"] .sse-root .sse-col > details[open] {
-  box-shadow: inset 2px 0 0 rgba(184,233,79,.55), inset 0 1px rgba(255,255,255,.02) !important;
-}
-
-/* Let the white plot fill the card and take its rounded corners, so it reads as
-   part of the UI rather than a white square dropped on top. Drop the card padding
-   and clip the Plotly surface to the card radius. */
-html[data-theme="pipeline"] .sse-root .sse-plot-card {
-  padding: 0 !important;
-  overflow: hidden;
-  border-radius: 14px !important;
-}
-html[data-theme="pipeline"] .sse-root .sse-plot-card .js-plotly-plot,
-html[data-theme="pipeline"] .sse-root .sse-plot-card .plot-container,
-html[data-theme="pipeline"] .sse-root .sse-plot-card .svg-container,
-html[data-theme="pipeline"] .sse-root .sse-plot-card .main-svg {
-  border-radius: 14px !important;
-}
-
-/* Lime accents — the pops that make the Pipeline app read as "alive". */
-html[data-theme="pipeline"] .sse-root .status-pill {
-  color: #dbff8a !important;
-  background: rgba(184,233,79,.12) !important;
-  box-shadow: inset 0 0 0 1px rgba(184,233,79,.22);
-}
-html[data-theme="pipeline"] .sse-root .detail-eyebrow,
-html[data-theme="pipeline"] .sse-root .detail-section h5 {
-  color: #b8e94f !important;
-}
-/* Checked filters/toggles glow lime (radios stay teal via accent-color below). */
-html[data-theme="pipeline"] .sse-root input[type=checkbox] { accent-color: #a9dd44; }
-
-/* Primary buttons -> teal gradient (~.primary-button). */
-html[data-theme="pipeline"] .sse-root .sse-btn-primary {
-  background: linear-gradient(90deg, #0b958b, #0eb5a4) !important;
-  color: #ecfffa !important; border: 0 !important;
-  box-shadow: 0 8px 22px rgba(0,169,156,.18), inset 0 1px rgba(255,255,255,.13) !important;
-}
-html[data-theme="pipeline"] .sse-root .sse-btn-primary:hover {
-  background: linear-gradient(90deg, #0eb5a4, #18c2af) !important;
-}
-/* Secondary buttons -> teal-outlined glass (~.secondary-button). */
-html[data-theme="pipeline"] .sse-root .sse-btn-sec {
-  background: rgba(5,51,59,.55) !important;
-  border-color: rgba(96,205,195,.22) !important;
-  color: #bcd2cf !important;
-}
-
-/* Dark teal fields to match Pipeline's .field inputs. Overrides the base
-   white-cell rules for this theme only. The CLOSED dropdown trigger
-   (button.dash-dropdown) and its value go dark; the OPEN options menu keeps
-   its white/black treatment (it is a separate dash-dropdown-options node, not
-   a descendant of the trigger), so readability is preserved. */
-html[data-theme="pipeline"] .sse-root [class*="dash-input-container"],
-html[data-theme="pipeline"] .sse-root textarea,
-html[data-theme="pipeline"] .sse-root button.dash-dropdown {
-  background: rgba(0,32,40,.72) !important;
-  border-color: rgba(96,205,195,.24) !important;
-}
-/* The base [class*="dash-dropdown"]{background:#fff} paints the trigger's inner
-   wrapper/value nodes white, hiding the dark button fill above. Make just those
-   closed-control nodes transparent (the open menu is dash-dropdown-options and
-   is untouched, so it keeps its white/black treatment). */
-html[data-theme="pipeline"] .sse-root .dash-dropdown-wrapper,
-html[data-theme="pipeline"] .sse-root .dash-dropdown-value,
-html[data-theme="pipeline"] .sse-root .dash-dropdown-value-item,
-html[data-theme="pipeline"] .sse-root .dash-dropdown-grid-container,
-html[data-theme="pipeline"] .sse-root .dash-dropdown-trigger {
-  background: transparent !important;
-}
-html[data-theme="pipeline"] .sse-root input[type=text],
-html[data-theme="pipeline"] .sse-root input[type=number],
-html[data-theme="pipeline"] .sse-root input[type=password],
-html[data-theme="pipeline"] .sse-root [class*="dash-input-element"],
-html[data-theme="pipeline"] .sse-root textarea,
-html[data-theme="pipeline"] .sse-root button.dash-dropdown,
-html[data-theme="pipeline"] .sse-root button.dash-dropdown span {
-  color: #dcebe8 !important;
-}
-html[data-theme="pipeline"] .sse-root [class*="dash-input-container"]:focus-within,
-html[data-theme="pipeline"] .sse-root button.dash-dropdown:focus-visible {
-  outline: none !important; border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(14,181,164,.14) !important;
-}
 </style>
 </head>
 <body>
@@ -1330,6 +854,7 @@ def build_app(entry_arg: str):
     global ENTRY
     ENTRY = resolve_entry(entry_arg)
     warning, loaded_layers = reload_state()
+    job_store.read_jobs(ENTRY.jobs_path, mark_stale=True)
 
     app = Dash(__name__, suppress_callback_exceptions=True)
     app.index_string = SSE_INDEX_STRING
@@ -1346,9 +871,11 @@ def build_app(entry_arg: str):
     def all_coord_opts():
         return [{"label": c, "value": c} for c in _STATE.coord_cols]
 
+    _boltz_jobs, _rmsd_jobs = current_job_records()
+
     app.layout = html.Div([
         dcc.Store(id="data-loaded-store", data=True),
-        dcc.Store(id="theme-store", data="pipeline"),
+        dcc.Store(id="theme-store", data="clean-lab"),
         dcc.Store(id="reload-counter", data=0),
         dcc.Store(id="fixed-color-store", data=DEFAULT_FIXED_COLOR),
         dcc.Store(id="layers-store", data=loaded_layers),
@@ -1359,14 +886,13 @@ def build_app(entry_arg: str):
         dcc.Store(id="selection-store", data=[]),
         dcc.Store(id="selection-color-store", data=DEFAULT_SELECTION_COLOR),
         dcc.Store(id="filter-pending-store", data=None),
-        dcc.Store(id="wheel-zoom-init-store", data=None),
-        dcc.Store(id="left-collapsed-store", data=False),
-        dcc.Store(id="right-collapsed-store", data=False),
-        dcc.Store(id="plot-theme-store", data=None),
+        dcc.Store(id="boltz-key-valid-store", data=False),
+        dcc.Store(id="boltz-clicked-id-store", data=None),
+        dcc.Interval(id="boltz-interval", interval=3000, n_intervals=0, disabled=True),
         dcc.Download(id="extract-download"),
         dcc.Download(id="figure-download"),
 
-        html.Div([html.Div([html.H2("Sequence Space Explorer", style={"margin": "0", "color": "var(--text)"}), html.Span(id="subtitle-text", children=f"Entry: {ENTRY.stem} · {_ann_df.shape[0]:,} rows · {len(_STATE.coord_cols)} coordinate column(s)", style={"color": "var(--text-muted)", "fontSize": "13px"}), html.Span(id="reload-status", children=warning or "", style={"color": "var(--warning)", "fontSize": "12px", "marginLeft": "10px"})]), html.Div([dcc.Dropdown(id="theme-select", options=[{"label": "Pipeline", "value": "pipeline"}, {"label": "Clean Lab", "value": "clean-lab"}, {"label": "Dark Lab", "value": "dark-lab"}, {"label": "Rose Quartz", "value": "rose-quartz"}, {"label": "Deep Canopy", "value": "deep-canopy"}], value="pipeline", clearable=False, persistence=True, style={"width": "150px", "fontSize": "12px", "marginRight": "10px"}), html.Button("Reload datafile", id="reload-btn", n_clicks=0, className="sse-btn-sec", style={"padding": "7px 12px", "backgroundColor": "var(--surface-2)", "border": "1px solid var(--border)", "borderRadius": "7px", "cursor": "pointer", "fontSize": "12px"})], style={"display": "flex", "alignItems": "center"})], className="sse-header", style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "marginBottom": "16px", "borderBottom": "1px solid var(--border)"}),
+        html.Div([html.Div([html.H2("Sequence Space Explorer", style={"margin": "0", "color": "var(--text)"}), html.Span(id="subtitle-text", children=f"Entry: {ENTRY.stem} · {_ann_df.shape[0]:,} rows · {len(_STATE.coord_cols)} coordinate column(s)", style={"color": "var(--text-muted)", "fontSize": "13px"}), html.Span(id="reload-status", children=warning or "", style={"color": "var(--warning)", "fontSize": "12px", "marginLeft": "10px"})]), html.Div([dcc.Dropdown(id="theme-select", options=[{"label": "Clean Lab", "value": "clean-lab"}, {"label": "Dark Lab", "value": "dark-lab"}, {"label": "Rose Quartz", "value": "rose-quartz"}, {"label": "Deep Canopy", "value": "deep-canopy"}], value="clean-lab", clearable=False, persistence=True, style={"width": "150px", "fontSize": "12px", "marginRight": "10px"}), html.Button("Reload datafile", id="reload-btn", n_clicks=0, style={"padding": "6px 10px", "backgroundColor": "var(--surface-2)", "border": "1px solid var(--border)", "borderRadius": "4px", "cursor": "pointer", "fontSize": "12px"})], style={"display": "flex", "alignItems": "center"})], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "marginBottom": "16px", "borderBottom": "2px solid var(--border)", "paddingBottom": "10px"}),
 
         html.Div([
             html.Div([
@@ -1374,32 +900,17 @@ def build_app(entry_arg: str):
 
                 html.Details([html.Summary("Appearance", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), html.P("Filtered points", style={**SECTION_STYLE, "margin": "0 0 4px 0"}), html.Label("Opacity", style={"fontSize": "12px"}), dcc.Slider(id="alpha-slider", min=0.05, max=1.0, step=0.05, value=DEFAULT_ALPHA, marks={0.05: "0.05", 0.5: "0.5", 1.0: "1"}), html.Label("Size", style={"fontSize": "12px"}), dcc.Slider(id="point-size-slider", min=2, max=20, step=1, value=DEFAULT_POINT_SIZE, marks={2: "2", 6: "6", 12: "12", 20: "20"}), html.Label("Shape", style={"fontSize": "12px"}), dcc.Dropdown(id="marker-symbol", options=MARKER_SYMBOL_OPTIONS, value=DEFAULT_SYMBOL, clearable=False, style={"fontSize": "12px", "marginBottom": "6px"}), html.P("Background points", style={**SECTION_STYLE, "margin": "14px 0 4px 0"}), html.Label("Size", style={"fontSize": "12px"}), dcc.Slider(id="bg-size-slider", min=1, max=12, step=1, value=DEFAULT_BG_SIZE, marks={1:"1",4:"4",8:"8",12:"12"}), html.P("Query markers", style={**SECTION_STYLE, "margin": "14px 0 4px 0"}), html.Label("Opacity", style={"fontSize":"12px"}), dcc.Slider(id="marker-alpha-slider", min=0.05, max=1.0, step=0.05, value=DEFAULT_MARKER_ALPHA, marks={0.05:"0.05",0.5:"0.5",1.0:"1"}), html.Label("Size", style={"fontSize":"12px"}), dcc.Slider(id="marker-size-slider", min=6, max=40, step=1, value=DEFAULT_MARKER_SIZE, marks={6:"6",14:"14",28:"28",40:"40"}), html.Label("Position", style={"fontSize":"12px"}), dcc.RadioItems(id="marker-mode", options=[{"label":" On top","value":"top"},{"label":" Below overlays","value":"bottom"},{"label":" Hide","value":"none"}], value=DEFAULT_MARKER_MODE, labelStyle={"display":"block","fontSize":"13px"}), html.P("Working filter position", style={**SECTION_STYLE, "margin": "14px 0 4px 0"}), dcc.RadioItems(id="wf-position", options=[{"label":" On top of saved layers","value":"top"},{"label":" Below saved layers","value":"bottom"}], value=DEFAULT_WF_POSITION, labelStyle={"display":"block","fontSize":"13px"})], open=False, style={"marginBottom": "16px"}),
 
-                html.Details([html.Summary("Colour", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), dcc.RadioItems(id="color-mode", options=[{"label":" Fixed color","value":"fixed"},{"label":" Continuous","value":"continuous"}], value=DEFAULT_COLOR_MODE, labelStyle={"display":"block","fontSize":"13px"}), html.Div(id="fixed-color-panel", children=[html.Label("Pick a color", style={"fontSize":"12px"}), html.Div([html.Div(id={"type":"color-chip","color":c}, style={"width":"22px","height":"22px","backgroundColor":c,"borderRadius":"3px","cursor":"pointer","border":"2px solid transparent","display":"inline-block","marginRight":"4px","marginBottom":"4px"}) for c in FIXED_COLOR_OPTIONS])]), html.Div(id="continuous-color-panel", children=[html.Label("Color by", style={"fontSize":"12px"}), dcc.Dropdown(id="cont-color-col", options=[{"label":c,"value":c} for c in cont_cols], value=cont_cols[0] if cont_cols else None, clearable=False, style={"fontSize":"13px","marginBottom":"6px"}), html.Label("Colormap", style={"fontSize":"12px"}), dcc.Dropdown(id="colormap-select", options=[{"label":c,"value":c} for c in COLORMAP_OPTIONS], value=DEFAULT_COLORMAP, clearable=False, style={"fontSize":"13px","marginBottom":"6px"}), dcc.Checklist(id="colormap-reversed", options=[{"label":html.Span(" Reverse colormap", style={"fontSize":"12px"}),"value":"reversed"}], value=[]), html.Label("Color range", style={"fontSize":"12px"}), dcc.RadioItems(id="color-range-mode", options=[{"label":" Global","value":"global"},{"label":" Subset","value":"subset"}], value=DEFAULT_COLOR_RANGE, labelStyle={"display":"block","fontSize":"12px"})], style={"display":"none"})], open=False, style={"marginBottom":"16px"}),
+                html.Details([html.Summary("Colour", style={"fontWeight": "bold", "cursor": "pointer", "marginBottom": "10px"}), dcc.RadioItems(id="color-mode", options=[{"label":" Fixed color","value":"fixed"},{"label":" Continuous","value":"continuous"}], value=DEFAULT_COLOR_MODE, labelStyle={"display":"block","fontSize":"13px"}), html.Div(id="fixed-color-panel", children=[html.Label("Pick a color", style={"fontSize":"12px"}), html.Div([html.Div(id={"type":"color-chip","color":c}, style={"width":"22px","height":"22px","backgroundColor":c,"borderRadius":"3px","cursor":"pointer","border":"2px solid transparent","display":"inline-block","marginRight":"4px","marginBottom":"4px"}) for c in FIXED_COLOR_OPTIONS])]), html.Div(id="continuous-color-panel", children=[html.Label("Color by", style={"fontSize":"12px"}), dcc.Dropdown(id="cont-color-col", options=[{"label":c,"value":c} for c in cont_cols], value=cont_cols[0] if cont_cols else None, clearable=False, style={"fontSize":"13px","marginBottom":"6px"}), html.Label("Colormap", style={"fontSize":"12px"}), dcc.Dropdown(id="colormap-select", options=[{"label":c,"value":c} for c in COLORMAP_OPTIONS], value=DEFAULT_COLORMAP, clearable=False, style={"fontSize":"13px","marginBottom":"6px"}), dcc.Checklist(id="colormap-reversed", options=[{"label":html.Span(" Reverse colormap", style={"fontSize":"12px"}),"value":"reversed"}], value=[]), html.Label("Color range", style={"fontSize":"12px"}), dcc.RadioItems(id="color-range-mode", options=[{"label":" Global","value":"global"},{"label":" Subset","value":"subset"}], value=DEFAULT_COLOR_RANGE, labelStyle={"display":"block","fontSize":"12px"})], style={"display":"none"})], open=True, style={"marginBottom":"16px"}),
 
                 html.Details([html.Summary("Filters", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), html.Div(id="filter-panel", children=make_filter_panel())], open=True, style={"marginBottom":"16px"}),
                 html.Details([html.Summary("Search by ID", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Checklist(id="id-search-enabled", options=[{"label":html.Span(" Enable ID/name search", style=LABEL_STYLE),"value":"on"}], value=[]), html.Div(id="id-search-control", children=[dcc.Textarea(id="id-search-input", placeholder="IDs separated by commas", style={"width":"100%","fontSize":"12px","minHeight":"60px","fontFamily":"monospace"}), html.Div(id="id-search-status", style={"fontSize":"11px","marginTop":"4px","color":"var(--text-muted)"})], style={"display":"none", **CONTROL_WRAPPER})], open=False, style={"marginBottom":"16px"}),
-                html.Details([html.Summary("Save layer", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Input(id="layer-name-input", type="text", placeholder="Auto-generated if blank", style={"width":"100%","fontSize":"12px","marginBottom":"8px"}), html.Button("Save layer", id="save-layer-btn", n_clicks=0, className="sse-btn-primary", style={"width":"100%","padding":"8px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"7px","cursor":"pointer","fontSize":"13px","fontWeight":"600"}), html.Div(id="save-layer-status", style={"fontSize":"11px","marginTop":"6px","color":"var(--text-muted)"})], open=False, style={"marginBottom":"16px"}),
-                html.Details([html.Summary("Cluster regions", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}),
-                    html.P("Show clusters as shaded regions or coloured points. Off until a column is picked.", style={"fontSize":"11px","color":"var(--text-muted)","margin":"0 0 8px 0"}),
-                    html.Label("Cluster column", style={"fontSize":"12px"}),
-                    dcc.Dropdown(id="cluster-region-col", options=[{"label":c,"value":c} for c in _types if _types.get(c)==TYPE_LABEL and c.endswith("_cluster")], value=None, placeholder="None (off)", clearable=True, style={"fontSize":"12px","marginBottom":"6px"}),
-                    html.Label("Style", style={"fontSize":"12px"}),
-                    dcc.RadioItems(id="cluster-region-shape", options=[{"label":" Density region (KDE)","value":"kde"},{"label":" Concave hull region","value":"hull"},{"label":" Colour points by cluster","value":"points"}], value="kde", labelStyle={"display":"block","fontSize":"13px"}),
-                    html.Label("Position", style={"fontSize":"12px"}),
-                    dcc.RadioItems(id="cluster-region-position", options=[{"label":" Below points","value":"below"},{"label":" On top","value":"above"}], value="below", labelStyle={"display":"block","fontSize":"13px"}),
-                    html.Label("Fill opacity", style={"fontSize":"12px"}),
-                    dcc.Slider(id="cluster-region-opacity", min=0.05, max=0.7, step=0.05, value=0.25, marks={0.05:"0.05",0.35:"0.35",0.7:"0.7"}),
-                    html.Label("Density coverage (KDE)", style={"fontSize":"12px"}),
-                    dcc.Slider(id="cluster-region-coverage", min=0.1, max=0.9, step=0.05, value=0.4, marks={0.1:"0.1",0.4:"0.4",0.9:"0.9"}),
-                    html.Label("Hull tightness", style={"fontSize":"12px"}),
-                    dcc.Slider(id="cluster-region-tightness", min=0.0, max=0.8, step=0.05, value=0.25, marks={0:"0",0.25:"0.25",0.8:"0.8"}),
-                ], open=False, style={"marginBottom":"16px"}),
+                html.Details([html.Summary("Save layer", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), dcc.Input(id="layer-name-input", type="text", placeholder="Auto-generated if blank", style={"width":"100%","fontSize":"12px","marginBottom":"8px"}), html.Button("Save layer", id="save-layer-btn", n_clicks=0, style={"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"13px"}), html.Div(id="save-layer-status", style={"fontSize":"11px","marginTop":"6px","color":"var(--text-muted)"})], open=True, style={"marginBottom":"16px"}),
                 html.Details([html.Summary("Column settings", style={"fontWeight":"bold","cursor":"pointer","marginBottom":"10px"}), html.Button("Rebuild filter panel", id="rebuild-filters-btn", n_clicks=0, style={"width":"100%","padding":"5px","fontSize":"12px","marginBottom":"8px"}), html.Div(id="col-settings-panel", children=make_col_settings_panel())], open=False, style={"marginBottom":"16px"}),
-            ], id="left-rail", className="sse-col sse-rail", style={"width": "290px", "minWidth": "270px", "flexShrink": "0", "overflowY": "auto", "maxHeight": "90vh", "paddingRight": "12px"}),
+            ], className="sse-col", style={"width": "290px", "minWidth": "270px", "flexShrink": "0", "overflowY": "auto", "maxHeight": "90vh", "paddingRight": "12px"}),
 
-            html.Div([html.Div([html.Button("‹", id="left-collapse-btn", n_clicks=0, className="rail-toggle", title="Collapse controls panel"), html.Span(id="point-count", className="plot-status", style={"fontSize":"12px","color":"var(--text-muted)","marginLeft":"2px"}), html.Button(html.Span(className="ic ic-eye"), id="wf-toggle-btn", n_clicks=0, title="Show/hide working filter", className="sse-icon-btn", style={"background":"none","border":"none","cursor":"pointer","color":"var(--text-muted)","padding":"4px 6px","marginLeft":"6px"}), html.Span(style={"flexGrow":"1"}), html.Button("›", id="right-collapse-btn", n_clicks=0, className="rail-toggle", title="Collapse layers panel")], className="sse-toolbar", style={"display":"flex","alignItems":"center","marginBottom":"6px"}), html.Div([html.Span(id="selection-count", children="No sequences selected", style={"fontSize":"12px","color":"var(--text-muted)","flexGrow":"1"}), html.Div([html.Div(style={"width":"18px","height":"18px","backgroundColor":c,"borderRadius":"50%","cursor":"pointer","display":"inline-block","marginRight":"4px","border":"2px solid var(--border)"}, id={"type":"sel-color-chip","color":c}, title=c) for c in SELECTION_COLOR_OPTIONS], style={"display":"inline-flex","alignItems":"center","marginRight":"6px"}), html.Button("Clear", id="clear-selection-btn", n_clicks=0, className="sse-btn-sec", style={"fontSize":"11px","padding":"3px 8px","marginRight":"4px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"6px","cursor":"pointer"}), html.Button("Use as working filter", id="selection-to-wl-btn", n_clicks=0, className="sse-btn-sec", style={"fontSize":"11px","padding":"3px 8px","marginRight":"4px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"6px","cursor":"pointer"}), html.Button("Export selection for Boltz", id="selection-export-btn", n_clicks=0, title="Save the selected sequences to a cache the pipeline's Boltz-2 module can import", className="sse-btn-sec", style={"fontSize":"11px","padding":"3px 8px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"6px","cursor":"pointer"})], className="selection-toolbar", style={"display":"flex","alignItems":"center","marginBottom":"8px","backgroundColor":"var(--surface)","border":"1px solid var(--border)"}), html.Div(id="selection-export-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"8px","minHeight":"14px"}), html.Div(dcc.Graph(id="latent-graph", style={"height":"72vh", "minHeight":"540px"}, config={"displaylogo":False,"scrollZoom":False,"responsive":True,"modeBarButtonsToAdd":["lasso2d","select2d"],"toImageButtonOptions":{"format":"png","filename":"sequence-space"}}), className="sse-plot-card"), html.Div(id="click-details", children=html.Div("Select a point to inspect metadata and analysis context.", className="details-empty"), className="details-card", style={"marginTop":"16px","backgroundColor":"var(--surface)","border":"1px solid var(--border)","borderRadius":"10px","fontSize":"13px","minHeight":"60px"}), html.Div(id="load-warning", style={"marginTop":"8px","fontSize":"11px","color":"var(--warning)"})], className="sse-center", style={"flexGrow":"1","minWidth":"0","paddingLeft":"16px","paddingRight":"16px"}),
+            html.Div([html.Div([html.Span(id="point-count", style={"fontSize":"12px","color":"var(--text-muted)"}), html.Button("👁", id="wf-toggle-btn", n_clicks=0, title="Show/hide working filter", style={"background":"none","border":"none","cursor":"pointer","fontSize":"14px","marginLeft":"8px"})], style={"display":"flex","alignItems":"center","marginBottom":"6px"}), html.Div([html.Span(id="selection-count", children="No sequences selected", style={"fontSize":"12px","color":"var(--text-muted)","flexGrow":"1"}), html.Div([html.Div(style={"width":"16px","height":"16px","backgroundColor":c,"borderRadius":"3px","cursor":"pointer","display":"inline-block","marginRight":"3px","border":"2px solid var(--border)"}, id={"type":"sel-color-chip","color":c}, title=c) for c in SELECTION_COLOR_OPTIONS], style={"display":"inline-flex","alignItems":"center","marginRight":"6px"}), html.Button("Clear", id="clear-selection-btn", n_clicks=0, style={"fontSize":"11px","padding":"3px 8px","marginRight":"4px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"4px","cursor":"pointer"}), html.Button("→ Working layer", id="selection-to-wl-btn", n_clicks=0, style={"fontSize":"11px","padding":"3px 8px","backgroundColor":"var(--surface-2)","color":"var(--text)","border":"1px solid var(--border)","borderRadius":"4px","cursor":"pointer"})], style={"display":"flex","alignItems":"center","marginBottom":"6px","padding":"6px 8px","backgroundColor":"var(--surface)","borderRadius":"6px","border":"1px solid var(--border)"}), dcc.Graph(id="latent-graph", style={"height":"75vh"}, config={"displaylogo":False,"scrollZoom":True,"modeBarButtonsToAdd":["lasso2d","select2d"]}), html.Div(id="click-details", children="Click a point to show details here.", style={"marginTop":"16px","padding":"14px","backgroundColor":"var(--surface)","border":"1px solid var(--border)","borderRadius":"8px","fontSize":"13px","minHeight":"60px"}), html.Div(id="load-warning", style={"marginTop":"8px","fontSize":"11px","color":"var(--warning)"})], style={"flexGrow":"1","minWidth":"0","paddingLeft":"16px","paddingRight":"16px"}),
 
-            html.Div([html.Div([html.Span("Saved layers", style={"fontWeight":"bold","fontSize":"14px","color":"var(--text)"}), html.Button("Clear all", id="clear-layers-btn", n_clicks=0, style={"background":"none","border":"none","color":"var(--danger)","cursor":"pointer","fontSize":"11px","float":"right"})], style={"marginBottom":"8px","borderBottom":"1px solid var(--border)","paddingBottom":"6px"}), html.Div(id="layers-sidebar", children=make_sidebar(loaded_layers)), html.Button("Extract visible layers", id="extract-btn", n_clicks=0, className="sse-btn-primary", style={"width":"100%","padding":"8px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"7px","cursor":"pointer","fontSize":"12px","fontWeight":"600","marginBottom":"6px","marginTop":"8px"}), html.Div(id="extract-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"8px"}), html.Details([
+            html.Div([html.Div([html.Span("Saved layers", style={"fontWeight":"bold","fontSize":"14px","color":"var(--text)"}), html.Button("Clear all", id="clear-layers-btn", n_clicks=0, style={"background":"none","border":"none","color":"var(--danger)","cursor":"pointer","fontSize":"11px","float":"right"})], style={"marginBottom":"8px","borderBottom":"1px solid var(--border)","paddingBottom":"6px"}), html.Div(id="layers-sidebar", children=make_sidebar(loaded_layers)), html.Button("⬇ Extract visible layers", id="extract-btn", n_clicks=0, style={"width":"100%","padding":"5px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"6px","marginTop":"8px"}), html.Div(id="extract-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"8px"}), html.Details([
                     html.Summary("Export figure", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"6px"}),
                     html.Label("Format", style={"fontSize":"11px"}),
                     dcc.RadioItems(id="export-format", options=EXPORT_FORMAT_OPTIONS, value="png", labelStyle={"display":"inline-block","fontSize":"12px","marginRight":"8px"}, style={"marginBottom":"4px"}),
@@ -1422,184 +933,29 @@ def build_app(entry_arg: str):
                     ], style={"display":"flex","marginBottom":"6px"}),
                     html.Label("Save to", style={"fontSize":"11px"}),
                     dcc.RadioItems(id="export-destination", options=[{"label":html.Span(" Browser download", style={"fontSize":"12px"}),"value":"browser"},{"label":html.Span(" Entry figures/", style={"fontSize":"12px"}),"value":"server"}], value="browser", labelStyle={"display":"block","marginBottom":"2px"}, inputStyle={"cursor":"pointer","marginRight":"4px"}, style={"marginBottom":"6px","marginTop":"2px"}),
-                    html.Button("Save figure", id="export-btn", n_clicks=0, className="sse-btn-primary", style={"width":"100%","padding":"8px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"7px","cursor":"pointer","fontSize":"12px","fontWeight":"600","marginBottom":"4px"}),
+                    html.Button("📷 Save figure", id="export-btn", n_clicks=0, style={"width":"100%","padding":"5px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"4px"}),
                     html.Div(id="export-status", style={"fontSize":"11px","color":"var(--text-muted)","wordBreak":"break-all"})
                 ], open=False, style={"marginBottom":"12px"}),
 
-                html.Details([
-                    html.Summary("Structure prediction & RMSD", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"8px"}),
+                html.Details([html.Summary("Boltz-2 structure prediction", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"8px"}), html.Label("NVIDIA API key", style={"fontSize":"11px"}), dcc.Input(id="boltz-api-key", type="password", placeholder="nvapi-…", style={"width":"100%","fontSize":"11px","fontFamily":"monospace","marginBottom":"4px"}), html.Button("Check API key", id="boltz-check-key-btn", n_clicks=0, style={"width":"100%","padding":"4px","fontSize":"11px","marginBottom":"4px"}), html.Div(id="boltz-key-status", style={"fontSize":"11px","marginBottom":"8px","minHeight":"14px"}), dcc.Checklist(id="boltz-use-msa", options=[{"label":html.Span(" Use MSA (recommended)", style={"fontSize":"12px"}),"value":"on"}], value=["on"], style={"marginBottom":"8px"}), html.Label("Substrate SMILES (optional)", style={"fontSize":"11px"}), dcc.Textarea(id="boltz-smiles", placeholder="One SMILES per line", style={"width":"100%","fontSize":"11px","fontFamily":"monospace","resize":"vertical","minHeight":"58px"}), html.Label("Ligand label (optional)", style={"fontSize":"11px"}), dcc.Input(id="boltz-smiles-label", type="text", placeholder="e.g. UDP-Glc", style={"width":"100%","fontSize":"11px","marginBottom":"6px"}), html.Details([
+                    html.Summary("Prediction parameters", style={"fontSize":"11px","cursor":"pointer","color":"var(--text-muted)","marginBottom":"6px"}),
                     html.Div([
-                        html.P("Boltz-2 structure prediction and RMSD analysis now run in the pipeline app, not here.", style={"fontSize":"11px","color":"var(--text-muted)","margin":"0 0 6px 0"}),
-                        html.P("Select the points you want, click “Export selection for Boltz” above, then open the pipeline's “Structure & binding” module to import that selection and run prediction. New pTM / pLDDT and RMSD columns appear here after you reload the datafile.", style={"fontSize":"11px","color":"var(--text-muted)","margin":"0"}),
-                    ]),
-                ], open=False, style={"marginBottom":"12px"})
-            ], id="right-rail", className="sse-col sse-rail", style={"width":"235px","minWidth":"215px","flexShrink":"0","paddingLeft":"12px","overflowY":"auto","maxHeight":"90vh"}),
-        ], className="sse-workspace", style={"display":"flex","gap":"0","alignItems":"flex-start"})
+                        html.Div([html.Label("Recycling steps", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-recycling-steps", type="number", value=3, min=1, max=10, step=1, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"4px"}),
+                        html.Div([html.Label("Sampling steps", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-sampling-steps", type="number", value=200, min=10, max=500, step=10, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"4px"}),
+                        html.Div([html.Label("Diffusion samples", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-diffusion-samples", type="number", value=5, min=1, max=10, step=1, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"4px"}),
+                        html.Div([html.Label("Step scale", style={"fontSize":"11px","lineHeight":"22px"}), dcc.Input(id="boltz-step-scale", type="number", value=1.638, min=0.1, max=5, step=0.001, debounce=True, style={"width":"72px","fontSize":"11px","padding":"2px 4px","boxSizing":"border-box","textAlign":"right"})], style={"display":"grid","gridTemplateColumns":"1fr 76px","alignItems":"center","gap":"6px","marginBottom":"2px"}),
+                    ], style={"width":"100%"}),
+                ], open=False, style={"marginBottom":"8px"}), dcc.Checklist(id="boltz-force-rerun", options=[{"label":html.Span(" Force re-run (ignore cache)", style={"fontSize":"12px"}),"value":"on"}], value=[]), html.Button("⚗ Send to Boltz-2", id="boltz-submit-btn", n_clicks=0, disabled=True, style={"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"not-allowed","fontSize":"12px","marginBottom":"4px","opacity":"0.4"}), html.Div(id="boltz-submit-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"6px"}), html.Div(id="boltz-summary", children=boltz_summary(_boltz_jobs), style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"6px","fontStyle":"italic"}), html.Div(id="boltz-job-table", children=make_job_table(_boltz_jobs), style={"fontSize":"11px","overflowX":"auto"})], open=False, style={"marginBottom":"12px"}),
+
+                html.Details([html.Summary("RMSD analysis", style={"fontWeight":"600","fontSize":"12px","cursor":"pointer","marginBottom":"8px"}), html.Div(id="rmsd-struct-list", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"4px"}), html.Label("Reference structure", style={"fontSize":"11px"}), dcc.Dropdown(id="rmsd-reference-select", placeholder="Select reference…", options=[], clearable=False, style={"fontSize":"11px","marginBottom":"4px"}), html.Div([html.Label("Reference rank", style={"fontSize":"11px","marginRight":"6px"}), dcc.Input(id="rmsd-ref-rank", type="number", value=0, min=0, step=1, debounce=True, style={"width":"55px","fontSize":"11px"})], style={"display":"flex","alignItems":"center","marginBottom":"8px"}), html.Label("Scope", style={"fontSize":"11px"}), dcc.RadioItems(id="rmsd-scope", options=[{"label":html.Span(" All completed apo structures", style={"fontSize":"12px"}),"value":"all"},{"label":html.Span(" Selected sequences only", style={"fontSize":"12px"}),"value":"selected"}], value="all", labelStyle={"display":"block","fontSize":"12px"}), html.Details([html.Summary("Advanced options — per-sequence rank", style={"fontSize":"11px","cursor":"pointer","color":"var(--text-muted)"}), html.Div(id="rmsd-rank-overrides", style={"fontSize":"11px"}), dcc.Store(id="rmsd-rank-store", data={}), dcc.Store(id="rmsd-seq-store", data=[])], open=False, style={"marginBottom":"8px"}), html.Label("Alignment method", style={"fontSize":"11px"}), dcc.RadioItems(id="rmsd-method", options=[{"label":html.Span(" Sequence-guided (super)", style={"fontSize":"12px"}),"value":"seq"},{"label":html.Span(" Structure-based (CE)", style={"fontSize":"12px"}),"value":"ce"},{"label":html.Span(" Both", style={"fontSize":"12px"}),"value":"both"}], value="seq", labelStyle={"display":"block","fontSize":"12px"}), html.Button("Calculate RMSDs", id="rmsd-calc-btn", n_clicks=0, style={"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","cursor":"pointer","fontSize":"12px","marginBottom":"4px"}), html.Div(id="rmsd-status", style={"fontSize":"11px","color":"var(--text-muted)","marginBottom":"6px","minHeight":"14px"}), html.Div(id="rmsd-results-table", style={"fontSize":"11px","overflowX":"auto"})], open=False, style={"marginBottom":"12px"})
+            ], className="sse-col", style={"width":"235px","minWidth":"215px","flexShrink":"0","paddingLeft":"12px","overflowY":"auto","maxHeight":"90vh"}),
+        ], style={"display":"flex","gap":"0","alignItems":"flex-start"})
     ], id="app-root", className="sse-root", style={"padding":"20px","fontFamily":"sans-serif","maxWidth":"1900px","margin":"0 auto"})
 
     app.clientside_callback(
-        "function(v){ v = v || 'pipeline'; document.documentElement.setAttribute('data-theme', v); return v; }",
+        "function(v){ v = v || 'clean-lab'; document.documentElement.setAttribute('data-theme', v); return v; }",
         Output("theme-store", "data"),
         Input("theme-select", "value"),
-    )
-
-    # Collapsible side rails. Toggling the rail's own style dict from the server
-    # risks clobbering it around dynamic panel rebuilds, so we mutate the DOM node's
-    # style directly on the client and only round-trip the boolean state + the
-    # toggle glyph. The plot column has flexGrow:1, so it reclaims the freed width.
-    for side, rail_id, btn_id, store_id, expanded_w, expanded_mw, pad_side, glyph_open, glyph_closed in [
-        ("left", "left-rail", "left-collapse-btn", "left-collapsed-store", "290px", "270px", "paddingRight", "‹", "›"),
-        ("right", "right-rail", "right-collapse-btn", "right-collapsed-store", "235px", "215px", "paddingLeft", "›", "‹"),
-    ]:
-        app.clientside_callback(
-            f"""
-            function(n, collapsed){{
-                const now = !collapsed;
-                const el = document.getElementById('{rail_id}');
-                if (el){{
-                    if (now){{
-                        el.style.width='0px'; el.style.minWidth='0px';
-                        el.style.{pad_side}='0px'; el.style.overflow='hidden'; el.style.opacity='0';
-                    }} else {{
-                        el.style.width='{expanded_w}'; el.style.minWidth='{expanded_mw}';
-                        el.style.{pad_side}='12px'; el.style.overflowY='auto'; el.style.opacity='1';
-                    }}
-                }}
-                return [now, now ? '{glyph_closed}' : '{glyph_open}'];
-            }}
-            """,
-            [Output(store_id, "data"), Output(btn_id, "children")],
-            Input(btn_id, "n_clicks"),
-            State(store_id, "data"),
-            prevent_initial_call=True,
-        )
-
-    # Custom throttled scroll-zoom for the latent graph. Plotly's native scrollZoom
-    # rubberbands on fast wheel input when a scaleanchor (equal-aspect) constraint is
-    # set, because each wheel tick triggers its own constraint-solving relayout and
-    # consecutive ticks solve to inconsistent ranges. We disable native scrollZoom and
-    # coalesce wheel events into a single relayout per animation frame, scaling both
-    # axes by the same factor so the 1:1 aspect ratio stays consistent (no oscillation).
-    app.clientside_callback(
-        """
-        function(fig) {
-            const nu = window.dash_clientside.no_update;
-            const container = document.getElementById('latent-graph');
-            if (!container) return nu;
-            if (container._customWheelZoom) return nu;
-            container._customWheelZoom = true;
-
-            let pending = 0;      // accumulated zoom exponent (log-factor)
-            let scheduled = false;
-            let lastEvent = null;
-
-            function applyZoom() {
-                scheduled = false;
-                const gd = container.classList.contains('js-plotly-plot')
-                    ? container : container.querySelector('.js-plotly-plot');
-                if (!gd || !gd._fullLayout) { pending = 0; return; }
-                const drag = gd.querySelector('.nsewdrag');
-                const xa = gd._fullLayout.xaxis, ya = gd._fullLayout.yaxis;
-                if (!drag || !xa || !ya || !xa.range || !ya.range) { pending = 0; return; }
-                const rect = drag.getBoundingClientRect();
-                if (!rect.width || !rect.height) { pending = 0; return; }
-                const x0 = xa.range[0], x1 = xa.range[1];
-                const y0 = ya.range[0], y1 = ya.range[1];
-                const fx = (lastEvent.clientX - rect.left) / rect.width;
-                const fy = (lastEvent.clientY - rect.top) / rect.height;
-                const cx = x0 + fx * (x1 - x0);          // cursor position in data coords
-                const cy = y1 - fy * (y1 - y0);          // (pixel-top corresponds to y-max)
-                const f = Math.exp(Math.max(-0.5, Math.min(0.5, pending)));  // clamp per-frame
-                pending = 0;
-                window.Plotly.relayout(gd, {
-                    'xaxis.range': [cx - (cx - x0) * f, cx + (x1 - cx) * f],
-                    'yaxis.range': [cy - (cy - y0) * f, cy + (y1 - cy) * f]
-                });
-            }
-
-            container.addEventListener('wheel', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                lastEvent = e;
-                let dy = e.deltaY;
-                if (e.deltaMode === 1) dy *= 16;               // line units -> approx px
-                else if (e.deltaMode === 2) dy *= window.innerHeight;
-                pending += dy * 0.0015;   // deltaY>0 (scroll down) -> f>1 -> zoom out
-                if (!scheduled) {
-                    scheduled = true;
-                    window.requestAnimationFrame(applyZoom);
-                }
-            }, { passive: false, capture: true });
-
-            return nu;
-        }
-        """,
-        Output("wheel-zoom-init-store", "data"),
-        Input("latent-graph", "figure"),
-    )
-
-    # Theme-aware plot chrome. make_figure renders with template="simple_white"
-    # (white paper, dark axes) because it has no idea which theme is active — the
-    # theme is a client-only CSS-variable swap. So after every figure render, and on
-    # every theme change, restyle the paper/axes/legend from the live CSS variables:
-    # this keeps the CSS the single source of truth (exact colour match in all four
-    # themes), updates instantly on switch, and avoids re-rendering the ~10k-point
-    # figure server-side. Paper/plot backgrounds go transparent so the surface of the
-    # .sse-plot-card shows through. Data-trace colours are intentionally left alone.
-    app.clientside_callback(
-        """
-        function(theme, fig) {
-            const nu = window.dash_clientside.no_update;
-            let tries = 0;
-            function apply() {
-                const gd = document.getElementById('latent-graph');
-                if (!gd) return;
-                const plot = gd.classList.contains('js-plotly-plot') ? gd : gd.querySelector('.js-plotly-plot');
-                if (!plot || !window.Plotly || !plot._fullLayout) {
-                    if (tries++ < 30) window.requestAnimationFrame(apply);
-                    return;
-                }
-                const cs = getComputedStyle(document.documentElement);
-                const v = n => cs.getPropertyValue(n).trim();
-                const text = v('--text'), muted = v('--text-muted'), border = v('--border'), surface = v('--surface');
-                // Pipeline theme: render the plot as a white "figure sheet" so the
-                // data stays readable against the dark card. Other themes keep the
-                // transparent-paper / CSS-variable treatment.
-                const white = theme === 'pipeline';
-                const paper = white ? '#ffffff' : 'rgba(0,0,0,0)';
-                const axisTxt = white ? '#3b4a55' : muted;
-                const titleTxt = white ? '#1f2733' : text;
-                const line = white ? '#cbd8d8' : border;
-                const legBg = white ? '#ffffff' : surface;
-                window.Plotly.relayout(plot, {
-                    'paper_bgcolor': paper,
-                    'plot_bgcolor': paper,
-                    'font.color': axisTxt,
-                    'xaxis.color': axisTxt,
-                    'yaxis.color': axisTxt,
-                    'xaxis.linecolor': line,
-                    'yaxis.linecolor': line,
-                    'xaxis.zerolinecolor': line,
-                    'yaxis.zerolinecolor': line,
-                    'xaxis.title.font.color': titleTxt,
-                    'yaxis.title.font.color': titleTxt,
-                    'legend.bgcolor': legBg,
-                    'legend.bordercolor': line,
-                    'legend.borderwidth': 1,
-                    'legend.font.color': titleTxt
-                });
-                // The pipeline theme drops the plot-card padding, which resizes the
-                // container after Plotly's initial draw; relayout does not remeasure,
-                // so force a resize to make the plot fill (and round to) the card.
-                if (window.Plotly.Plots && window.Plotly.Plots.resize) window.Plotly.Plots.resize(plot);
-            }
-            apply();
-            return nu;
-        }
-        """,
-        Output("plot-theme-store", "data"),
-        Input("theme-store", "data"),
-        Input("latent-graph", "figure"),
     )
 
     # ---------------- callbacks ----------------
@@ -1720,7 +1076,7 @@ def build_app(entry_arg: str):
     @app.callback(Output("wf-visible-store", "data"), Output("wf-toggle-btn", "children"), Input("wf-toggle-btn", "n_clicks"), State("wf-visible-store", "data"), prevent_initial_call=True)
     def toggle_wf_visibility(_, currently_visible):
         now = not currently_visible
-        return now, html.Span(className="ic ic-eye" if now else "ic ic-eyeoff")
+        return now, "👁" if now else "🚫"
 
     @app.callback(Output("layers-store", "data"), Output("save-layer-status", "children"), Output("layer-name-input", "value"), Input("save-layer-btn", "n_clicks"), State("layer-name-input", "value"), State("color-mode", "value"), State("fixed-color-store", "data"), State("cont-color-col", "value"), State("colormap-select", "value"), State("colormap-reversed", "value"), State("color-range-mode", "value"), State("alpha-slider", "value"), State("point-size-slider", "value"), State("marker-symbol", "value"), State({"type":"filter-enabled", "col":ALL}, "value"), State({"type":"filter-enabled", "col":ALL}, "id"), State({"type":"cont-slider", "col":ALL}, "value"), State({"type":"cont-slider", "col":ALL}, "id"), State({"type":"bool-filter", "col":ALL}, "value"), State({"type":"bool-filter", "col":ALL}, "id"), State({"type":"cat-filter", "col":ALL}, "value"), State({"type":"cat-filter", "col":ALL}, "id"), State({"type":"tag-filter", "col":ALL}, "value"), State({"type":"tag-filter", "col":ALL}, "id"), State("id-search-enabled", "value"), State("id-search-input", "value"), State("layers-store", "data"), prevent_initial_call=True)
     def save_layer_cb(n_clicks, custom_name, color_mode, fixed_color, cont_col, colormap, colormap_reversed, color_range_mode, alpha, point_size, marker_symbol, enabled_values, enabled_ids, cont_values, cont_ids, bool_values, bool_ids, cat_values, cat_ids, tag_values, tag_ids, id_enabled, id_raw, existing_layers):
@@ -1826,11 +1182,7 @@ def build_app(entry_arg: str):
         cat_lookup = {c: vs for c, vs in fs.get("cat", [])}
         tag_lookup = {c: ts for c, ts in fs.get("tag", [])}
         enabled = [["on"] if d["col"] in cont_lookup or d["col"] in bool_lookup or d["col"] in cat_lookup or d["col"] in tag_lookup else [] for d in enabled_ids]
-
-        def _cont_default(col):
-            vmin, vmax, _step, _marks = slider_config(numeric_col(col))
-            return [vmin, vmax]
-        cont = [cont_lookup[d["col"]] if d["col"] in cont_lookup else _cont_default(d["col"]) for d in cont_ids]
+        cont = [cont_lookup.get(d["col"], [slider_config(_ann_df[d["col"]])[0], slider_config(_ann_df[d["col"]])[1]]) for d in cont_ids]
         bools = [bool_lookup.get(d["col"], "all") for d in bool_ids]
         cats = [cat_lookup.get(d["col"], []) for d in cat_ids]
         tags = [tag_lookup.get(d["col"], []) for d in tag_ids]
@@ -1860,11 +1212,11 @@ def build_app(entry_arg: str):
             out.append(opts)
         return out
 
-    @app.callback(Output("latent-graph", "figure"), Output("point-count", "children"), Input("data-loaded-store", "data"), Input("reload-counter", "data"), Input("coord-cols-store", "data"), Input("alpha-slider", "value"), Input("point-size-slider", "value"), Input("bg-size-slider", "value"), Input("marker-size-slider", "value"), Input("marker-alpha-slider", "value"), Input("marker-mode", "value"), Input("wf-position", "value"), Input("color-mode", "value"), Input("fixed-color-store", "data"), Input("cont-color-col", "value"), Input("colormap-select", "value"), Input("colormap-reversed", "value"), Input("color-range-mode", "value"), Input({"type":"filter-enabled", "col":ALL}, "value"), Input({"type":"filter-enabled", "col":ALL}, "id"), Input({"type":"cont-slider", "col":ALL}, "value"), Input({"type":"cont-slider", "col":ALL}, "id"), Input({"type":"bool-filter", "col":ALL}, "value"), Input({"type":"bool-filter", "col":ALL}, "id"), Input({"type":"cat-filter", "col":ALL}, "value"), Input({"type":"cat-filter", "col":ALL}, "id"), Input({"type":"tag-filter", "col":ALL}, "value"), Input({"type":"tag-filter", "col":ALL}, "id"), Input("layers-store", "data"), Input("wf-visible-store", "data"), Input("id-search-enabled", "value"), Input("id-search-input", "n_blur"), Input("marker-symbol", "value"), Input("selection-store", "data"), Input("selection-color-store", "data"), Input("cluster-region-col", "value"), Input("cluster-region-shape", "value"), Input("cluster-region-position", "value"), Input("cluster-region-opacity", "value"), Input("cluster-region-coverage", "value"), Input("cluster-region-tightness", "value"), State("id-search-input", "value"))
-    def update_figure(_loaded, _reload, _coord, alpha, point_size, bg_size, marker_size, marker_alpha, marker_mode, wf_position, color_mode, fixed_color, cont_col, colormap, colormap_reversed, color_range_mode, enabled_values, enabled_ids, cont_values, cont_ids, bool_values, bool_ids, cat_values, cat_ids, tag_values, tag_ids, layers, wf_visible, id_enabled, _blur, wf_symbol, selection_ids, selection_color, region_col, region_shape, region_position, region_opacity, region_coverage, region_tightness, id_raw):
+    @app.callback(Output("latent-graph", "figure"), Output("point-count", "children"), Input("data-loaded-store", "data"), Input("reload-counter", "data"), Input("coord-cols-store", "data"), Input("alpha-slider", "value"), Input("point-size-slider", "value"), Input("bg-size-slider", "value"), Input("marker-size-slider", "value"), Input("marker-alpha-slider", "value"), Input("marker-mode", "value"), Input("wf-position", "value"), Input("color-mode", "value"), Input("fixed-color-store", "data"), Input("cont-color-col", "value"), Input("colormap-select", "value"), Input("colormap-reversed", "value"), Input("color-range-mode", "value"), Input({"type":"filter-enabled", "col":ALL}, "value"), Input({"type":"filter-enabled", "col":ALL}, "id"), Input({"type":"cont-slider", "col":ALL}, "value"), Input({"type":"cont-slider", "col":ALL}, "id"), Input({"type":"bool-filter", "col":ALL}, "value"), Input({"type":"bool-filter", "col":ALL}, "id"), Input({"type":"cat-filter", "col":ALL}, "value"), Input({"type":"cat-filter", "col":ALL}, "id"), Input({"type":"tag-filter", "col":ALL}, "value"), Input({"type":"tag-filter", "col":ALL}, "id"), Input("layers-store", "data"), Input("wf-visible-store", "data"), Input("id-search-enabled", "value"), Input("id-search-input", "n_blur"), Input("marker-symbol", "value"), Input("selection-store", "data"), Input("selection-color-store", "data"), State("id-search-input", "value"))
+    def update_figure(_loaded, _reload, _coord, alpha, point_size, bg_size, marker_size, marker_alpha, marker_mode, wf_position, color_mode, fixed_color, cont_col, colormap, colormap_reversed, color_range_mode, enabled_values, enabled_ids, cont_values, cont_ids, bool_values, bool_ids, cat_values, cat_ids, tag_values, tag_ids, layers, wf_visible, id_enabled, _blur, wf_symbol, selection_ids, selection_color, id_raw):
         cont_conds, bool_conds, cat_conds, tag_conds, id_search_ids = parse_current_conditions(enabled_values, enabled_ids, cont_values, cont_ids, bool_values, bool_ids, cat_values, cat_ids, tag_values, tag_ids, id_enabled, id_raw)
         with _STATE_LOCK:
-            fig, n_filtered, n_cov = make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_color, cont_col, colormap or DEFAULT_COLORMAP, bool(colormap_reversed and "reversed" in colormap_reversed), color_range_mode or DEFAULT_COLOR_RANGE, alpha or DEFAULT_ALPHA, point_size or DEFAULT_POINT_SIZE, bg_size or DEFAULT_BG_SIZE, marker_size or DEFAULT_MARKER_SIZE, marker_alpha or DEFAULT_MARKER_ALPHA, marker_mode or DEFAULT_MARKER_MODE, wf_position or DEFAULT_WF_POSITION, True if wf_visible is None else wf_visible, layers or [], id_search_ids, wf_symbol or DEFAULT_SYMBOL, selection_ids or [], selection_color or DEFAULT_SELECTION_COLOR, region_col, region_shape or "kde", region_position or "below", region_opacity if region_opacity is not None else 0.25, region_coverage if region_coverage is not None else 0.4, region_tightness if region_tightness is not None else 0.25)
+            fig, n_filtered, n_cov = make_figure(cont_conds, bool_conds, cat_conds, tag_conds, color_mode, fixed_color, cont_col, colormap or DEFAULT_COLORMAP, bool(colormap_reversed and "reversed" in colormap_reversed), color_range_mode or DEFAULT_COLOR_RANGE, alpha or DEFAULT_ALPHA, point_size or DEFAULT_POINT_SIZE, bg_size or DEFAULT_BG_SIZE, marker_size or DEFAULT_MARKER_SIZE, marker_alpha or DEFAULT_MARKER_ALPHA, marker_mode or DEFAULT_MARKER_MODE, wf_position or DEFAULT_WF_POSITION, True if wf_visible is None else wf_visible, layers or [], id_search_ids, wf_symbol or DEFAULT_SYMBOL, selection_ids or [], selection_color or DEFAULT_SELECTION_COLOR)
             total = len(_ann_df)
         n_vis = len([l for l in (layers or []) if l.get("visible", True)])
         count = f"Showing {n_filtered:,} / {total:,} filtered sequences · {n_cov:,} have coordinates here"
@@ -1872,13 +1224,13 @@ def build_app(entry_arg: str):
             count += f" · {n_vis} saved layer(s) visible"
         return fig, count
 
-    @app.callback(Output("click-details", "children"), Output("selection-store", "data", allow_duplicate=True), Input("latent-graph", "clickData"), State("selection-store", "data"), prevent_initial_call=True)
+    @app.callback(Output("click-details", "children"), Output("selection-store", "data", allow_duplicate=True), Output("boltz-clicked-id-store", "data"), Input("latent-graph", "clickData"), State("selection-store", "data"), prevent_initial_call=True)
     def handle_click(click_data, current_selection):
         if not click_data or not click_data.get("points"):
-            return "Click a point to show details here.", no_update
+            return "Click a point to show details here.", no_update, no_update
         cd = click_data["points"][0].get("customdata")
         if cd is None:
-            return "No data for this point.", no_update
+            return "No data for this point.", no_update, no_update
         seq_id = cd if isinstance(cd, str) else cd[0]
         sel = list(current_selection or [])
         if seq_id in sel:
@@ -1887,7 +1239,7 @@ def build_app(entry_arg: str):
             sel.append(seq_id)
         with _STATE_LOCK:
             details = make_details_panel(seq_id)
-        return details, sel
+        return details, sel, seq_id
 
     @app.callback(Output("selection-count", "children"), Input("selection-store", "data"))
     def selection_count(sel):
@@ -1906,32 +1258,6 @@ def build_app(entry_arg: str):
     @app.callback(Output("id-search-enabled", "value", allow_duplicate=True), Output("id-search-input", "value", allow_duplicate=True), Input("selection-to-wl-btn", "n_clicks"), State("selection-store", "data"), prevent_initial_call=True)
     def selection_to_wl(n, sel):
         return (["on"], ", ".join(sel)) if n and sel else (no_update, no_update)
-
-    @app.callback(Output("selection-export-status", "children"), Input("selection-export-btn", "n_clicks"), State("selection-store", "data"), prevent_initial_call=True)
-    def export_selection(n, sel):
-        # Write the selected sequences to a timestamped selection cache on disk.
-        # The pipeline's Boltz-2 module (scripts/sse_boltz.py) imports these.
-        if not n:
-            return no_update
-        ids = [str(x) for x in (sel or [])]
-        if not ids:
-            return "No sequences selected to export."
-        if COL_SEQ not in _ann_df.columns:
-            return f"Cannot export: no '{COL_SEQ}' column in this entry."
-        with _STATE_LOCK:
-            rows = _ann_df[id_str().isin(ids)]
-            seq_by_id = {str(r[_id_col]): str(r[COL_SEQ]).strip() for _, r in rows.iterrows()}
-        sequences = [{"id": sid, "sequence": seq_by_id.get(sid, "")} for sid in ids]
-        missing = [s["id"] for s in sequences if not s["sequence"]]
-        try:
-            path = selection_cache.write_selection(ENTRY.selections_dir, ENTRY.stem, sequences)
-        except Exception as exc:
-            return f"Export failed: {exc}"
-        payload = selection_cache.read_selection(path)
-        msg = f"Exported {payload.get('count', 0)} sequence(s) → selections/{path.name}"
-        if missing:
-            msg += f" · {len(missing)} skipped (no sequence)"
-        return msg
 
     @app.callback(Output("extract-download", "data"), Output("extract-status", "children"), Input("extract-btn", "n_clicks"), State("layers-store", "data"), prevent_initial_call=True)
     def extract_layers(n, layers):
@@ -2075,6 +1401,210 @@ def build_app(entry_arg: str):
         except Exception as exc:
             return f"Export failed: {exc}", no_update
 
+    @app.callback(Output("boltz-key-status", "children"), Output("boltz-key-status", "style"), Output("boltz-key-valid-store", "data"), Input("boltz-check-key-btn", "n_clicks"), State("boltz-api-key", "value"), prevent_initial_call=True)
+    def check_key(n, key):
+        ok, msg = boltz_backend.validate_api_key(key or "")
+        color = "var(--success)" if ok else "var(--danger)"
+        return ("✓ " if ok else "✗ ") + msg, {"fontSize":"11px","marginBottom":"8px","minHeight":"14px","color":color}, ok
+
+    @app.callback(Output("boltz-key-valid-store", "data", allow_duplicate=True), Output("boltz-key-status", "children", allow_duplicate=True), Input("boltz-api-key", "value"), prevent_initial_call=True)
+    def invalidate_key(_):
+        return False, ""
+
+    @app.callback(Output("boltz-submit-btn", "disabled"), Output("boltz-submit-btn", "style"), Input("boltz-key-valid-store", "data"), Input("boltz-clicked-id-store", "data"))
+    def boltz_button_state(valid, clicked):
+        base = {"width":"100%","padding":"6px","backgroundColor":"var(--accent)","color":"var(--on-accent)","border":"none","borderRadius":"4px","fontSize":"12px","marginBottom":"4px"}
+        enabled = bool(valid) and bool(clicked)
+        return (not enabled, {**base, "cursor":"pointer" if enabled else "not-allowed", "opacity":"1" if enabled else "0.4"})
+
+    @app.callback(Output("boltz-submit-status", "children"), Output("boltz-interval", "disabled"), Input("boltz-submit-btn", "n_clicks"), State("boltz-clicked-id-store", "data"), State("boltz-api-key", "value"), State("boltz-key-valid-store", "data"), State("boltz-use-msa", "value"), State("boltz-force-rerun", "value"), State("boltz-smiles", "value"), State("boltz-smiles-label", "value"), State("boltz-recycling-steps", "value"), State("boltz-sampling-steps", "value"), State("boltz-diffusion-samples", "value"), State("boltz-step-scale", "value"), prevent_initial_call=True)
+    def submit_boltz(n, clicked_id, key, valid, use_msa, force_val, smiles, smiles_label, recycling, sampling, diffusion, scale):
+        if not n:
+            return no_update, no_update
+        if not valid:
+            return "API key not validated.", no_update
+        if not clicked_id:
+            return "Click a sequence first.", no_update
+        rows = _ann_df[_ann_df[_id_col].astype(str) == str(clicked_id)]
+        if rows.empty or COL_SEQ not in _ann_df.columns:
+            return "Selected sequence not found or Sequence column missing.", no_update
+        sequence = str(rows.iloc[0][COL_SEQ]).strip()
+        params = boltz_backend.BoltzParams(_coerce_int(recycling, 3), _coerce_int(sampling, 200), _coerce_int(diffusion, 5), _coerce_float(scale, 1.638))
+        try:
+            job, should_run, msg = boltz_backend.submit_or_cache(ENTRY, str(clicked_id), sequence, api_key=key or "", smiles=smiles or "", smiles_label=smiles_label or "", use_msa=bool(use_msa and "on" in use_msa), params=params, force=bool(force_val and "on" in force_val))
+            if should_run:
+                fut = _boltz_executor.submit(boltz_backend.run_prediction, ENTRY, job["job_key"])
+                _boltz_futures[job["job_key"]] = fut
+            return f"{msg} {clicked_id}", False
+        except Exception as exc:
+            return f"Boltz submit failed: {exc}", no_update
+
+    @app.callback(
+        Output("boltz-job-table", "children"),
+        Output("boltz-summary", "children"),
+        Output("boltz-interval", "disabled", allow_duplicate=True),
+        Output("reload-counter", "data", allow_duplicate=True),
+        Output("filter-panel", "children", allow_duplicate=True),
+        Output("col-settings-panel", "children", allow_duplicate=True),
+        Output("filter-pending-store", "data", allow_duplicate=True),
+        Input("boltz-interval", "n_intervals"),
+        State("reload-counter", "data"),
+        prevent_initial_call=True,
+    )
+    def poll_boltz(_n, counter):
+        # Surface worker exceptions as error jobs. When a worker finishes, reload
+        # the datafile and rebuild dynamic filter/colour controls so newly written
+        # Boltz pTM/pLDDT columns immediately become available.
+        completed_any = False
+        for key, fut in list(_boltz_futures.items()):
+            if fut.done():
+                completed_any = True
+                try:
+                    fut.result()
+                except Exception as exc:
+                    job_store.update_job(ENTRY.jobs_path, "boltz", key, status="error", error=str(exc))
+                _boltz_futures.pop(key, None)
+        with _STATE_LOCK:
+            before_cols = set(_ann_df.columns)
+        reload_state()
+        with _STATE_LOCK:
+            after_cols = set(_ann_df.columns)
+        completed_any = completed_any or (before_cols != after_cols)
+        jobs, _ = current_job_records()
+        active = any(j.get("status") in {"queued", "msa", "predicting"} for j in jobs.values())
+        pending = {"source": "boltz", "counter": (counter or 0) + 1} if completed_any else no_update
+        cleared = html.Div() if completed_any else no_update
+        return make_job_table(jobs), boltz_summary(jobs), not active, (counter or 0) + 1, cleared, cleared, pending
+
+    @app.callback(Output("boltz-job-table", "children", allow_duplicate=True), Output("boltz-summary", "children", allow_duplicate=True), Input("boltz-submit-status", "children"), prevent_initial_call=True)
+    def refresh_boltz_table(_):
+        jobs, _r = current_job_records()
+        return make_job_table(jobs), boltz_summary(jobs)
+
+    @app.callback(
+        Output("rmsd-reference-select", "options"),
+        Output("rmsd-reference-select", "value"),
+        Output("rmsd-rank-overrides", "children"),
+        Output("rmsd-struct-list", "children"),
+        Output("rmsd-rank-store", "data"),
+        Output("rmsd-seq-store", "data"),
+        Input("boltz-interval", "n_intervals"),
+        Input("reload-counter", "data"),
+        Input("boltz-submit-status", "children"),
+        State("rmsd-rank-store", "data"),
+        State("rmsd-reference-select", "value"),
+    )
+    def refresh_rmsd_structs(_i, _r, _s, rank_store, current_ref):
+        seqs = rmsd_backend.list_apo_structures(ENTRY)
+        if not seqs:
+            empty = html.Div("No predicted apo structures yet.", style={"fontSize":"11px","color":"var(--text-faint)"})
+            return [], None, empty, empty, {}, []
+
+        rank_store = {str(k): int(v or 0) for k, v in (rank_store or {}).items()}
+        seq_ids = [str(s["id"]) for s in seqs]
+        max_by_id = {str(s["id"]): int(s.get("max_rank", 0) or 0) for s in seqs}
+
+        # Preserve existing user-entered ranks when the structure list refreshes;
+        # only initialize newly discovered structures to rank 0. Clamp vanished or
+        # out-of-range values rather than resetting the whole store.
+        clean_store = {}
+        for sid in seq_ids:
+            clean_store[sid] = max(0, min(int(rank_store.get(sid, 0) or 0), max_by_id[sid]))
+
+        opts = [{"label": sid, "value": sid} for sid in seq_ids]
+        selected_ref = current_ref if current_ref in seq_ids else seq_ids[0]
+
+        overrides = []
+        for s in seqs:
+            sid = str(s["id"])
+            max_rank = max_by_id[sid]
+            overrides.append(html.Div([
+                html.Span(sid, style={"fontFamily":"monospace","fontSize":"10px","flexGrow":"1","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap","maxWidth":"120px"}),
+                html.Span(f"0-{max_rank}", style={"fontSize":"9px","color":"var(--text-faint)","marginRight":"4px"}),
+                dcc.Input(
+                    id={"type":"rmsd-rank", "sid":sid},
+                    type="number",
+                    value=clean_store[sid],
+                    min=0, max=max_rank, step=1, debounce=True,
+                    style={"width":"45px","fontSize":"10px","padding":"2px 4px","border":"1px solid var(--border)","borderRadius":"3px"},
+                ),
+            ], style={"display":"grid","gridTemplateColumns":"minmax(0, 1fr) 28px 52px","alignItems":"center","gap":"4px","marginBottom":"3px"}))
+
+        return opts, selected_ref, overrides, html.Div(f"{len(seqs)} apo structure(s) available.", style={"fontSize":"11px","color":"var(--text-muted)"}), clean_store, seq_ids
+
+    @app.callback(
+        Output("rmsd-rank-store", "data", allow_duplicate=True),
+        Input({"type":"rmsd-rank", "sid":ALL}, "value"),
+        State({"type":"rmsd-rank", "sid":ALL}, "id"),
+        State("rmsd-rank-store", "data"),
+        prevent_initial_call=True,
+    )
+    def update_rmsd_rank_store(values, ids, current_store):
+        if values is None or ids is None:
+            return no_update
+        store = dict(current_store or {})
+        changed = False
+        for value, id_d in zip(values, ids):
+            sid = str(id_d.get("sid", ""))
+            if not sid:
+                continue
+            try:
+                rank = max(0, int(value or 0))
+            except (TypeError, ValueError):
+                rank = 0
+            if store.get(sid) != rank:
+                store[sid] = rank
+                changed = True
+        return store if changed else no_update
+
+    @app.callback(
+        Output("rmsd-status", "children"),
+        Output("rmsd-results-table", "children"),
+        Output("filter-panel", "children", allow_duplicate=True),
+        Output("reload-counter", "data", allow_duplicate=True),
+        Output("filter-pending-store", "data", allow_duplicate=True),
+        Input("rmsd-calc-btn", "n_clicks"),
+        State("rmsd-reference-select", "value"),
+        State("rmsd-ref-rank", "value"),
+        State("rmsd-rank-store", "data"),
+        State({"type":"rmsd-rank", "sid":ALL}, "value"),
+        State({"type":"rmsd-rank", "sid":ALL}, "id"),
+        State("rmsd-method", "value"),
+        State("rmsd-scope", "value"),
+        State("selection-store", "data"),
+        State("reload-counter", "data"),
+        prevent_initial_call=True,
+    )
+    def calc_rmsd(n, ref_id, ref_rank, rank_store, rank_values, rank_ids, method, scope, selection, counter):
+        if not n:
+            return no_update, no_update, no_update, no_update, no_update
+        if not ref_id:
+            return "Select a reference first.", no_update, no_update, no_update, no_update
+        methods = ["seq", "ce"] if method == "both" else [method or "seq"]
+        rank_store = dict(rank_store or {})
+        # Use the live input values from the DOM at click time as the source of
+        # truth, so clicking Calculate immediately after editing a rank does not
+        # depend on a blur/Enter event updating rmsd-rank-store first.
+        for value, id_d in zip(rank_values or [], rank_ids or []):
+            sid = str((id_d or {}).get("sid", ""))
+            if not sid:
+                continue
+            try:
+                rank_store[sid] = max(0, int(value or 0))
+            except (TypeError, ValueError):
+                rank_store[sid] = 0
+        query_ids = [str(x) for x in (selection or [])] if scope == "selected" else None
+        if scope == "selected" and not query_ids:
+            return "No selected sequences to compare.", no_update, no_update, no_update, no_update
+        try:
+            res = rmsd_backend.calculate_rmsds(ENTRY, ref_id, int(ref_rank or 0), query_ids=query_ids, query_rank_map=rank_store or {}, methods=methods)
+            reload_state()
+            status = f"Done — {res['n_new']} calculated, {res['n_cached']} from cache. Columns: {', '.join(res['columns'])}"
+            pending = {"source": "rmsd", "counter": (counter or 0) + 1}
+            return status, make_rmsd_results_table(res["results"]), html.Div(), (counter or 0) + 1, pending
+        except Exception as exc:
+            return f"RMSD failed: {exc}", no_update, no_update, no_update, no_update
+
     @app.callback(Output("filter-panel", "children", allow_duplicate=True), Output("col-settings-panel", "children", allow_duplicate=True), Output("filter-pending-store", "data", allow_duplicate=True), Input("rebuild-filters-btn", "n_clicks"), State({"type":"col-override", "col":ALL}, "value"), State({"type":"col-override", "col":ALL}, "id"), prevent_initial_call=True)
     def rebuild_filters(n, override_values, override_ids):
         if not n:
@@ -2105,10 +1635,7 @@ def main(argv=None):
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     print(f"Starting Sequence Space Explorer for {ENTRY.stem} on http://127.0.0.1:{args.port}")
-    # use_reloader=False: the reloader forks a second process that actually holds
-    # the port, which the pipeline runner can't see or stop, so it would survive
-    # shutdown and keep the port bound. One process shuts down cleanly.
-    app.run(debug=True, port=args.port, use_reloader=False)
+    app.run(debug=True, port=args.port)
     return 0
 
 
